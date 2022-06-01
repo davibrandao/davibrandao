@@ -1,5 +1,7 @@
+[![MasterHead](https://1.bp.blogspot.com/-7A4WynwLsM...)](https://davibrandao.io)
 <h1 align="center">Hi 👋, I'm Davi Lauritzen</h1>
 <h3 align="center">A passionate backend developer from Brazil</h3>
+(img align="right" alt="Coding" width="400" src="https://media4.giphy.com/media/vrxxqQbyRxYi6scCjT/giphy.gif?cid=ecf05e475akyqes1z0jccxmz0swhaoq3j0wtopvqam2muz99&rid=giphy.gif&ct=g")
 
 - 🌱 I’m currently learning **Java, Spring Boot, NodeJS**
 

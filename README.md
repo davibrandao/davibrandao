@@ -3,7 +3,7 @@
 <h3 align="center">A passionate backend developer from Brazil</h3>
 <img align="right" alt="Coding" width="400" src="https://media4.giphy.com/media/vrxxqQbyRxYi6scCjT/giphy.gif?cid=ecf05e475akyqes1z0jccxmz0swhaoq3j0wtopvqam2muz99&rid=giphy.gif&ct=g">
 
-- 🌱 I’m currently learning **Java, Spring Boot, NodeJS**
+- 🌱 I’m currently learning **Java, Spring Boot, SQL**
 
 - 👨‍💻 All of my projects are available at [https://github.com/davibrandao?tab=repositories](https://github.com/davibrandao?tab=repositories)
 
@@ -11,7 +11,6 @@
 
 - 📫 How to reach me **davi.lauritzen1@gmail.com**
 
-- ⚡ Fun fact **My cat's name was "Old Cat"**
 
 <h3 align="left">Connect with me:</h3>
 <p align="left">

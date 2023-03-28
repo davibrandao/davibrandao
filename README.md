@@ -1,4 +1,4 @@
-[![MasterHead](https://mlfdekmfzbw2.i.optimole.com/meQYe-M-z-aMU3e7/w:auto/h:auto/q:auto/https://www.appzlogic.com/wp-content/uploads/2019/07/backend.jpg)](https://davibrandao.io)
+(https://davibrandao.io)
 <h1 align="center">Hi 👋, I'm Davi Lauritzen</h1>
 <h3 align="center">A passionate backend developer from Brazil</h3>
 <img align="right" alt="Coding" width="400" src="https://media4.giphy.com/media/vrxxqQbyRxYi6scCjT/giphy.gif?cid=ecf05e475akyqes1z0jccxmz0swhaoq3j0wtopvqam2muz99&rid=giphy.gif&ct=g">

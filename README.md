@@ -2,8 +2,6 @@
 <h3 align="center">A passionate backend developer from Brazil</h3>
 
 
-- 🌱 I’m currently learning **Angular, Typescript, Django**
-
 - 👨‍💻 All of my projects are available at [https://github.com/davibrandao?tab=repositories](https://github.com/davibrandao?tab=repositories)
 
 - 💬 Ask me about **Java, Spring Boot, Azure, Jdbc**

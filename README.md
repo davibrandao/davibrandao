@@ -4,7 +4,7 @@
 
 - 👨‍💻 All of my projects are available at [https://github.com/davibrandao?tab=repositories](https://github.com/davibrandao?tab=repositories)
 
-- 💬 Ask me about **Java, Spring Boot, Azure, Jdbc**
+- 💬 Ask me about **Backend, Typescript, Express.js, Python**
 
 - 📫 How to reach me **davi.lauritzen1@gmail.com**
 

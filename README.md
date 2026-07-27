@@ -27,6 +27,45 @@ My work spans **SaaS products, AI-assisted workflows, internal platforms, search
   </tr>
 </table>
 
+## Production experience
+
+My background combines product-company engineering with end-to-end delivery for international clients.
+
+<table>
+  <tr>
+    <td width="56" align="center">
+      <a href="https://www.snapmagic.com"><img src="./assets/experience/snapmagic.png" width="38" alt="SnapMagic logo" /></a>
+    </td>
+    <td>
+      <strong><a href="https://www.snapmagic.com">SnapMagic</a> <sub>(formerly SnapEDA)</sub></strong><br />
+      <sub>Software Engineer, GTM · 2024-present</sub><br />
+      Production engineering across search, data systems, monitoring, incident resolution, and customer-facing workflows for a high-traffic electronics platform.
+    </td>
+  </tr>
+  <tr>
+    <td width="56" align="center">
+      <a href="https://gobrunch.com"><img src="./assets/experience/gobrunch.png" width="38" alt="GoBrunch logo" /></a>
+    </td>
+    <td>
+      <strong><a href="https://gobrunch.com">GoBrunch</a></strong><br />
+      <sub>Full-Stack Developer · 2023-2024</sub><br />
+      Shipped real-time collaboration, cloud-storage, and interaction features for an immersive virtual workspace product.
+    </td>
+  </tr>
+  <tr>
+    <td width="56" align="center">
+      <a href="https://www.s-fx.com"><img src="./assets/experience/sfx.png" width="38" alt="S-FX.com logo" /></a>
+    </td>
+    <td>
+      <strong><a href="https://www.s-fx.com">S-FX.com</a></strong><br />
+      <sub>API Developer · 2022-2023</sub><br />
+      Built PHP and SOAP integrations plus an IoT-backed operational dashboard for a US technology-services company.
+    </td>
+  </tr>
+</table>
+
+Alongside these roles, I have delivered SaaS platforms, internal systems, automation, and full-stack products for international clients through Upwork since 2022.
+
 ## Selected product work
 
 Five live, interactive products built to demonstrate complete operational workflows rather than static dashboard concepts.

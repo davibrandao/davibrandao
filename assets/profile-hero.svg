@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="460" viewBox="0 0 1280 460" role="img" aria-labelledby="title description">
+  <title id="title">Davi Lauritzen — senior full-stack engineer</title>
+  <desc id="description">Premium editorial banner in warm stone and charcoal, presenting Davi Lauritzen as a senior full-stack engineer focused on SaaS, AI systems, and internal platforms.</desc>
+  <defs>
+    <pattern id="grain" width="96" height="96" patternUnits="userSpaceOnUse">
+      <circle cx="8" cy="12" r="0.75" fill="#171918" opacity="0.08"/>
+      <circle cx="64" cy="27" r="0.55" fill="#171918" opacity="0.07"/>
+      <circle cx="31" cy="74" r="0.65" fill="#171918" opacity="0.06"/>
+      <circle cx="84" cy="86" r="0.7" fill="#171918" opacity="0.07"/>
+    </pattern>
+    <clipPath id="panel">
+      <rect x="0" y="0" width="1280" height="460" rx="28"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#panel)">
+    <rect width="1280" height="460" fill="#e9e3d9"/>
+    <rect width="1280" height="460" fill="url(#grain)"/>
+    <rect x="887" width="393" height="460" fill="#171918"/>
+
+    <rect x="64" y="58" width="10" height="10" rx="2" fill="#c7782b"/>
+    <text x="88" y="69" fill="#3b4549" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" letter-spacing="3.2">FLICKODE / ENGINEERING</text>
+
+    <text x="64" y="168" fill="#171918" font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="700" letter-spacing="-2.8">Davi Lauritzen</text>
+    <text x="66" y="226" fill="#5d615e" font-family="Georgia, 'Times New Roman', serif" font-size="37" font-style="italic">Senior full-stack engineer</text>
+
+    <line x1="66" y1="272" x2="797" y2="272" stroke="#b8b0a4" stroke-width="1"/>
+
+    <text x="66" y="319" fill="#272b2a" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="600">Production software from architecture to rollout.</text>
+    <text x="66" y="358" fill="#666a67" font-family="Arial, Helvetica, sans-serif" font-size="18">SaaS platforms  ·  AI systems  ·  Internal operations</text>
+
+    <circle cx="944" cy="96" r="8" fill="#22785f"/>
+    <circle cx="1171" cy="360" r="8" fill="#c7782b"/>
+    <path d="M944 96 C1050 96 1048 182 1110 182 S1171 264 1171 360" fill="none" stroke="#e9e3d9" stroke-width="2.4"/>
+    <path d="M944 96 C1003 96 1006 182 1110 182" fill="none" stroke="#22785f" stroke-width="4"/>
+    <path d="M1110 182 C1170 182 1171 264 1171 360" fill="none" stroke="#c7782b" stroke-width="4"/>
+
+    <text x="934" y="416" fill="#a8aaa5" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" letter-spacing="2.6">DISCOVER  /  DESIGN  /  DELIVER</text>
+  </g>
+</svg>

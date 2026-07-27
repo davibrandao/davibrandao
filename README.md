@@ -34,11 +34,21 @@ My background combines product-company engineering with end-to-end delivery for 
 <table>
   <tr>
     <td width="56" align="center">
+      <a href="https://www.stratifi.com"><img src="./assets/experience/stratifi.png" width="38" alt="StratiFi logo" /></a>
+    </td>
+    <td>
+      <strong><a href="https://www.stratifi.com">StratiFi Technologies</a></strong><br />
+      <sub>Customer Success Engineer · Apr 2026-present</sub><br />
+      Work across engineering and customer-facing teams to investigate issues, validate releases, improve product reliability, and support a smooth platform experience.
+    </td>
+  </tr>
+  <tr>
+    <td width="56" align="center">
       <a href="https://www.snapmagic.com"><img src="./assets/experience/snapmagic.png" width="38" alt="SnapMagic logo" /></a>
     </td>
     <td>
       <strong><a href="https://www.snapmagic.com">SnapMagic</a> <sub>(formerly SnapEDA)</sub></strong><br />
-      <sub>Software Engineer, GTM · 2024-present</sub><br />
+      <sub>Software Engineer, GTM · Oct 2024-Apr 2026</sub><br />
       Production engineering across search, data systems, monitoring, incident resolution, and customer-facing workflows for a high-traffic electronics platform.
     </td>
   </tr>

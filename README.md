@@ -37,7 +37,7 @@ Five live, interactive products built to demonstrate complete operational workfl
 
 ### Nexus
 
-AI workflow supervision with human approvals, recoverable execution, evidence, and audit history.  
+AI workflow supervision with human approvals, recoverable execution, evidence, and audit history.<br />
 **[Explore the live product →](https://nexus.flickode.com)**
 
 <a href="https://verity.flickode.com">
@@ -46,7 +46,7 @@ AI workflow supervision with human approvals, recoverable execution, evidence, a
 
 ### Verity
 
-Document intelligence for reviewable answers, exact citations, evidence inspection, and governed decisions.  
+Document intelligence for reviewable answers, exact citations, evidence inspection, and governed decisions.<br />
 **[Explore the live product →](https://verity.flickode.com)**
 
 <a href="https://fieldline.flickode.com">
@@ -55,7 +55,7 @@ Document intelligence for reviewable answers, exact citations, evidence inspecti
 
 ### Fieldline
 
-Offline-safe field inspections with evidence capture, remediation, conflict handling, and operational reporting.  
+Offline-safe field inspections with evidence capture, remediation, conflict handling, and operational reporting.<br />
 **[Explore the live product →](https://fieldline.flickode.com)**
 
 <a href="https://flux.flickode.com">
@@ -64,7 +64,7 @@ Offline-safe field inspections with evidence capture, remediation, conflict hand
 
 ### Flux
 
-Scenario planning that connects assumptions to runway, cash, margin, hiring capacity, and board-ready narrative.  
+Scenario planning that connects assumptions to runway, cash, margin, hiring capacity, and board-ready narrative.<br />
 **[Explore the live product →](https://flux.flickode.com)**
 
 <a href="https://atlas.flickode.com">
@@ -73,7 +73,7 @@ Scenario planning that connects assumptions to runway, cash, margin, hiring capa
 
 ### Atlas
 
-An interactive spatial command surface for utility networks, field incidents, telemetry, routes, and coordinated response.  
+An interactive spatial command surface for utility networks, field incidents, telemetry, routes, and coordinated response.<br />
 **[Explore the live product →](https://atlas.flickode.com)**
 
 <sub>These are independently created portfolio products with fictional organizations and data. They do not imply client commissions or fabricated business outcomes.</sub>
@@ -105,5 +105,5 @@ Planning a SaaS product, internal platform, AI workflow, or complex modernizatio
 
 I work with founders and product teams on carefully scoped builds, technical discovery, and production delivery.
 
-**[Tell me what you want to build](mailto:hello@flickode.com?subject=Project%20inquiry%20from%20GitHub)**  
+**[Tell me what you want to build](mailto:hello@flickode.com?subject=Project%20inquiry%20from%20GitHub)**<br />
 [Flickode](https://www.flickode.com) · [Upwork](https://www.upwork.com/freelancers/davilauritzen) · [LinkedIn](https://www.linkedin.com/in/davilauritzen/)

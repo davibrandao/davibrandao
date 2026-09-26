@@ -17,9 +17,13 @@
   converts a DAW-style bar.beat into a beat index (`K.bb(3, 2) = 9`).
 - Events sit on beats, eighths (x.5), or sixteenths (x.25, x.75). Nothing lands in
   between. The review flags anything off the 16th grid.
-- Budget about 2–2.5 beats per state: one beat for the morph to land, and one for an
-  interaction inside the state. Big states (player, chart, palette) can take 3–4 beats if
-  a small state gets only 1–2.
+- Budget by interactions. A morph takes about 1 beat. Each click, drag step, hover move or
+  typing burst takes about 1 beat. A multi-step drag (a date range, a long scrub) takes 3–5.
+  Sum the plan, then round up to whole bars. States usually average 2–2.5 beats, but a
+  rich state (player, chart, palette, date picker) can take 3–5 if a small one gets 1.
+- Default chain when the user asks for "the usual": button → loader → check → dynamic
+  island → music player → volume slider → toggle → tabs → chart → ⌘K pill → command
+  palette → toast (12 states, 28 beats, 7 bars; section 7).
 - Other tempos: scale the motion with the beat. A good morph duration is about 1.1 × beat
   (0.55 s at 120 BPM, 0.45 s at 140, 0.7 s at 90). At slow tempos, put interactions on
   eighths so there is still something every half second.
@@ -53,6 +57,10 @@
 - **Drags:** hold for a beat or two. Keep a drag as one keyframe segment
   (`{ drag: true }`), because several keys would make the cursor stop at each one.
   The value comes from the cursor (`K.drag`), never the other way round.
+- **Discrete drags snap on the grid:** when a drag walks over cells or detents, the cursor
+  crosses them at arbitrary times. Sample what's under the cursor on 16ths with
+  `K.steps(...)` and drive the UI, events and ticks from those keys. The cursor stays smooth
+  and the steps stay on the beat.
 - **Anchors are functions** when the target moves (a playing progress thumb):
   `[9, (t) => thumbAt(t)]`.
 - **Get out of the way.** After a click, drift to a spot that doesn't cover the next

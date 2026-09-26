@@ -5,8 +5,8 @@
 - Take a file path, or download a URL with `curl -L -o song.mp3 URL`. Mixkit track pages
   link an MP3 on `assets.mixkit.co`. If the page URL is given, find the audio URL in the
   page. If the network blocks the host, ask the user to upload the file.
-- Don't claim license terms. Tell the user to check the track's license page. Mixkit's free
-  music license covers use in videos.
+- Mixkit tracks are free for commercial use in videos. Still point the user to the specific
+  track's license page, and make no other legal claims.
 - No song yet? `python3 scripts/placeholder_track.py placeholder.wav --bpm 120` makes a
   synthetic groove with a known grid. It's fine for timing work but never the deliverable.
 
@@ -37,6 +37,12 @@ Loop start (`candidates`): each downbeat that has room for `--bars` bars is scor
 - minus a penalty for the first 4 bars.
 
 Override with `--start SECONDS` (it snaps to the nearest downbeat) or `--start bar:N`.
+
+The summary's `seam` line (`section.xfade_dip_db`) is the loudness of the crossfaded half
+beat relative to the loop's own last half beat. Near 0 dB is seamless. Below about -6 dB,
+the loop audibly ducks just before it restarts, which happens when the pre-roll is a
+breakdown or silence. Pick another candidate, or mix with `--xfade-beats 0.25`.
+`loop_similarity` alone doesn't decide this; the dip does.
 
 Key fields in `beats.json`: `bpm`, `steady_tempo`, `downbeat_phase`, `downbeat_confidence`,
 `beats`, `downbeats`, `bar_energy`, `candidates[]`, and
@@ -80,6 +86,9 @@ the cue times (the worst was 1.4 ms).
 - Music is normalized to -1.5 dBFS peak, and UI sounds sit at `--ui-db -8` (relative to full
   scale, with the sounds peak-normalized). Lower it to -11 for a subtler mix, and raise it to
   -6 for louder UI. It's safety-limited to -0.3 dBFS.
+- The video is a whole number of frames, so it can be up to half a frame longer or shorter
+  than the musical loop (3.8 ms at 124 BPM). The mix is cut to the video's length, and the
+  crossfade hides the difference.
 - `render.py --song --beats` does all of this (it generates the kit if missing) and writes
   `PROJECT/mix.wav` and `PROJECT/cues.json`. To remix without re-rendering, run
   `python3 scripts/mix_audio.py --song S --beats beats.json --cues PROJECT/cues.json --out mix.wav`

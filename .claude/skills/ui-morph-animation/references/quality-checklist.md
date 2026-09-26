@@ -1,8 +1,9 @@
 # By-eye review checklist
 
 Run `review.py --mid`, open `review/sheet.png`, then open full-size frames for anything
-doubtful. `--at 12.5,19.25` renders exact close-ups. Go row by row, one bar per row, beats
-and half-beats.
+doubtful. `--at 12.5,19.25` renders exact close-ups, and `--range 18.75:19.75:0.125`
+renders a filmstrip of one transition. Go row by row, one bar per row, beats and
+half-beats.
 
 ## Every frame
 - [ ] One shape. No second container appears, and nothing is cut in or out without the

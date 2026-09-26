@@ -312,15 +312,7 @@ K.layer(el.typed, 'input', vis.typed); K.layer(el.tipA, 'tip', vis.tipA); K.laye
 
 // ---------------------------------------------------------------- helpers
 const sw = (v, o) => K.swap(v, o);
-// text at world (x, y): anchor l = left edge at x, r = right edge at x, c = centred; y = vertical centre
-function text(e, x, y, size, anchor, v, extra = {}, swo) {
-  const box = { top: y - size * 0.6, height: size * 1.2, lineHeight: `${size * 1.2}px`, fontSize: size };
-  if (anchor === 'l') box.left = x; else if (anchor === 'r') box.right = -x; else { box.left = x - 150; box.width = 300; box.textAlign = 'center'; }
-  K.css(e, { position: 'absolute', ...box, ...sw(v, swo), ...extra });
-}
-function iconAt(e, x, y, size, v, color, extra = {}) {
-  K.css(e, { position: 'absolute', left: x - size / 2, top: y - size / 2, width: size, height: size, color, ...sw(v), ...extra });
-}
+const text = K.textAt, iconAt = K.iconAt; // (el, x, y, size, anchor|v, …) in world px — see kit-api.md
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 // ---------------------------------------------------------------- frame(t): every dynamic style, every frame
@@ -389,13 +381,13 @@ K.onFrame((t) => {
   iconAt(el.volLo, -126, 0, 20, vv, INK);
   iconAt(el.volHi, hiX, 0, 20, vv, mixHex('#6E6E70', INK, cover));
 
-  // tabs: gray labels, plus an ink copy clipped to the indicator — the inversion follows the
-  // liquid edges pixel for pixel instead of fading the whole word
+  // tabs: a gray copy outside the indicator and an ink copy inside it (complementary clips),
+  // so the inversion follows the liquid edges pixel for pixel and no glyph is drawn twice
   const ty = TAB_Y(t), vtab = vis.tabs(t);
   tabs.forEach((tab, k) => {
-    const xc = -126 + 84 * k, il = clamp(L - (xc - 150), 0, 300), ir = clamp(xc + 150 - R, 0, 300);
-    text(tab, xc, ty, 15, 'c', vtab, { fontWeight: 500, color: '#8E8E90' });
-    text(tabsInk[k], xc, ty, 15, 'c', vtab, { fontWeight: 500, color: INK, clipPath: `inset(0px ${ir.toFixed(2)}px 0px ${il.toFixed(2)}px)` });
+    const xc = -126 + 84 * k, clip = K.splitClip(xc - 150, 300, L, R, 18);
+    text(tab, xc, ty, 15, 'c', vtab, { fontWeight: 500, color: '#8E8E90', clipPath: clip.outside });
+    text(tabsInk[k], xc, ty, 15, 'c', vtab, { fontWeight: 500, color: INK, clipPath: clip.inside });
   });
   K.css(el.tabsTrack, { left: -172, top: -134, width: 344, height: 52, borderRadius: 26, background: 'rgba(255,255,255,.08)', opacity: vis.tabsTrack(t) });
 

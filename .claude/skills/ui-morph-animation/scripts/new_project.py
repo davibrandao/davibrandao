@@ -54,6 +54,10 @@ def main():
         cfg["bpm"] = a.bpm
 
     src = SKILL / ("examples/reference.html" if a.from_example else "assets/template.html")
+    if a.from_example and cfg["bars"] != 7:
+        print(f"note: the reference timeline is 7 bars (28 beats) and this loop is {cfg['bars']} bars. Keys past beat "
+              f"{cfg['bars'] * 4} wrap to the start, so re-time PLAN, CAM, the cursor keys and presence windows "
+              f"before the first review.", file=sys.stderr)
     html = src.read_text()
     html, n = re.subn(r"const CONFIG = \{.*?\};", "const CONFIG = " + json.dumps(cfg) + ";", html, count=1, flags=re.S)
     if n != 1:

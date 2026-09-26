@@ -19,7 +19,9 @@
   const lerp = (a, b, u) => a + (b - a) * u;
   const invLerp = (a, b, x) => (b === a ? 0 : (x - a) / (b - a));
   const remap = (x, a, b, c, d) => lerp(c, d, clamp(invLerp(a, b, x)));
-  const mod = (x, m) => ((x % m) + m) % m;
+  // Exact for x already in [0, m): ((x % m) + m) % m would shift it by one ulp, and a frame
+  // seeked exactly on a beat would then show the state just before that beat.
+  const mod = (x, m) => { const r = x % m; return r < 0 ? r + m : r; };
   // Minimum-jerk 0→1: zero velocity and acceleration at both ends (how hands move).
   const minjerk = (u) => { u = clamp(u); return u * u * u * (10 + u * (-15 + 6 * u)); };
   // Deterministic hash noise in [0,1) — use instead of Math.random().
@@ -76,14 +78,21 @@
 
   // ----------------------------------------------------------------- colors
   // Color springs run in OKLab so black→accent never passes through mud.
-  function hexToRgb(hex) {
-    const m = /^rgba?\(([^)]+)\)/.exec(String(hex).trim());
-    if (m) return m[1].split(/[\s,/]+/).slice(0, 3).map((v) => parseFloat(v) / 255);
-    let h = String(hex).replace('#', '');
-    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  // '#rgb', '#rrggbb', '#rrggbbaa', 'rgb(…)', 'rgba(…)' → [r, g, b, a] in 0..1
+  function parseColor(c) {
+    const s = String(c).trim();
+    const m = /^rgba?\(([^)]+)\)/.exec(s);
+    if (m) {
+      const p = m[1].split(/[\s,/]+/).filter(Boolean);
+      const num = (v, i) => (v.endsWith('%') ? (parseFloat(v) / 100) * (i < 3 ? 255 : 1) : parseFloat(v));
+      return [num(p[0], 0) / 255, num(p[1], 1) / 255, num(p[2], 2) / 255, p.length > 3 ? num(p[3], 3) : 1];
+    }
+    let h = s.replace('#', '');
+    if (h.length === 3 || h.length === 4) h = h.split('').map((ch) => ch + ch).join('');
     const n = parseInt(h.slice(0, 6), 16);
-    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255, h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1];
   }
+  const hexToRgb = (c) => parseColor(c).slice(0, 3);
   const toLin = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
   const toGamma = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
   function oklab(hex) {
@@ -216,13 +225,15 @@
       for (let i = 0; i < g.length - 1; i++) if (t < g[i + 1]) return i + (t - g[i]) / (g[i + 1] - g[i]);
       return g.length - 1 + (t - g[g.length - 1]) / ((g[g.length - 1] - g[0]) / (g.length - 1));
     };
-    // Seconds since a beat, wrapped into [-T/2, T/2): loop-aware "time since event".
-    // Use it for anything that draws/counts after an event near the end of the loop
-    // (a toast icon drawing at beat 27 must still be drawn at t = 0.1 after the wrap).
-    K.since = (t, beat) => {
-      let d = t - K.b(beat);
-      if (K.loop) d = mod(d + K.T / 2, K.T) - K.T / 2;
-      return d;
+    // Loop-aware "seconds since an event": t is read inside a one-loop window that starts at
+    // fromBeat (default: half a loop before the event). Use it for anything that draws or
+    // counts after an event, e.g. a toast icon drawing at beat 27 must still be drawn at
+    // t = 0.1 after the wrap. Pass fromBeat = the beat the element appears, so its draw-on
+    // stays drawn until it leaves, however long it stays or wherever the seam falls.
+    K.since = (t, beat, fromBeat) => {
+      if (!K.loop) return t - K.b(beat);
+      const w0 = fromBeat === undefined ? K.b(beat) - K.T / 2 : K.b(fromBeat);
+      return w0 + mod(t - w0, K.T) - K.b(beat);
     };
     // bar/beat (1-based, like a DAW) → beat index. K.bb(3, 2) = 9; K.bb(3, 2, 0.5) = 9.5
     K.bb = (bar, beat = 1, frac = 0) => (bar - 1) * K.beatsPerBar + (beat - 1) + frac;
@@ -279,10 +290,10 @@
       const parts = Array.from({ length: n }, (_, i) => K.track(keys.map((k) => [k[0], k[1][i], k[2]]), sp, o));
       return (t) => parts.map((p) => p(t));
     };
-    // Color track in OKLab: keys [[beat, '#hex', spring?]] → t => 'rgb(…)'
+    // Color track in OKLab (alpha springs too): keys [[beat, '#hex' | 'rgba(…)', spring?]] → t => css color
     K.colorTrack = (keys, sp, o) => {
-      const tr = K.trackN(keys.map((k) => [k[0], oklab(k[1]), k[2]]), sp, o);
-      const f = (t, alpha = 1) => oklabToCss(tr(t), alpha);
+      const tr = K.trackN(keys.map((k) => [k[0], [...oklab(k[1]), parseColor(k[1])[3]], k[2]]), sp, o);
+      const f = (t, alpha = 1) => { const v = tr(t); return oklabToCss(v, clamp(v[3]) * alpha); };
       f.lab = tr;
       return f;
     };
@@ -318,11 +329,13 @@
     // Exit is fast and starts on the beat; enter starts a hair later and settles slower,
     // so two labels are never legible on top of each other.
     const ENTER = spring(0.38, 0), EXIT = spring(0.2, 0);
+    // { instant: true } appears on the beat with no fade (keystrokes, a caret, a badge count).
     K.presence = (t, inBeat, outBeat, o = {}) => {
       const tin = inBeat == null ? -1e9 : K.b(inBeat) + (o.delay ?? 0.06);
       const tout = outBeat == null ? 1e9 : K.b(outBeat) + (o.outDelay ?? 0);
       const en = o.enter || ENTER, ex = o.exit || EXIT;
-      const one = (tt) => (inBeat == null ? 1 : en.step(tt - tin)) * (outBeat == null ? 1 : 1 - ex.step(tt - tout));
+      const enterAt = (tt) => (inBeat == null ? 1 : o.instant ? (tt >= K.b(inBeat) + (o.delay ?? 0) ? 1 : 0) : en.step(tt - tin));
+      const one = (tt) => enterAt(tt) * (outBeat == null ? 1 : 1 - ex.step(tt - tout));
       if (!K.loop) return one(t);
       return Math.max(one(t), one(t + K.T), one(t - K.T));
     };
@@ -446,6 +459,49 @@
     K.text = (el, s) => { if (el.textContent !== s) el.textContent = s; };
     // Box helper: position a centered box (world units) — returns css props.
     K.box = (cx, cy, w, h, r) => ({ position: 'absolute', left: cx - w / 2, top: cy - h / 2, width: w, height: h, borderRadius: r });
+    // Text at world (x, y) with visibility v: anchor 'l' = left edge at x, 'r' = right edge at x,
+    // 'c' = centred (in a 300-wide box); y is the vertical centre. `swo` goes to K.swap.
+    K.textAt = (el, x, y, size, anchor, v, extra = {}, swo) => {
+      const box = { top: y - size * 0.6, height: size * 1.2, lineHeight: `${(size * 1.2).toFixed(3)}px`, fontSize: size };
+      if (anchor === 'l') box.left = x;
+      else if (anchor === 'r') box.right = -x;
+      else { box.left = x - 150; box.width = 300; box.textAlign = 'center'; }
+      K.css(el, { position: 'absolute', ...box, ...K.swap(v, swo), ...extra });
+    };
+    // A size×size box centred at world (x, y) — icons, glyph SVGs. `color` feeds currentColor.
+    K.iconAt = (el, x, y, size, v, color, extra = {}) =>
+      K.css(el, { position: 'absolute', left: x - size / 2, top: y - size / 2, width: size, height: size, color, ...K.swap(v), ...extra });
+    // Complementary clips for inverting a label under a moving fill (tabs, segmented controls):
+    // the base copy gets `outside`, the inverted copy gets `inside`. No glyph is drawn twice,
+    // so there is no halo — even white over ink on an accent fill. All values in world px.
+    K.splitClip = (boxLeft, boxWidth, L, R, boxHeight = 1000) => {
+      const W = boxWidth, H = boxHeight, l = clamp(L - boxLeft, 0, W), r = clamp(R - boxLeft, l, W);
+      const f = (n) => `${n.toFixed(2)}px`;
+      return {
+        inside: `inset(0px ${f(W - r)} 0px ${f(l)})`,
+        outside: `polygon(evenodd, 0px 0px, ${f(W)} 0px, ${f(W)} ${f(H)}, 0px ${f(H)}, 0px 0px, ${f(l)} 0px, ${f(l)} ${f(H)}, ${f(r)} ${f(H)}, ${f(r)} 0px, ${f(l)} 0px)`,
+      };
+    };
+    // Snap a continuous value to the 16th grid: sample fn(t) on every grid point between two
+    // beats and return keys [[beat, value], …] only where the value changes. Use it for drags
+    // over discrete things (calendar cells, detents, stepper values) so each step lands on the
+    // grid instead of wherever the cursor happens to cross. Optionally registers events/cues.
+    K.steps = (fn, fromBeat, toBeat, o = {}) => {
+      const grid = o.grid ?? 0.25, keys = [];
+      let prev;
+      for (let b = fromBeat; b <= toBeat + 1e-9; b += grid) {
+        const beat = Math.round(b / grid) * grid, v = fn(K.b(beat));
+        if (prev === undefined || v !== prev) {
+          keys.push([beat, v]);
+          if (prev !== undefined) {
+            if (o.label) K.event(beat, typeof o.label === 'function' ? o.label(v) : o.label);
+            if (o.sound) K.cue(beat, o.sound, o.gain ?? 1);
+          }
+        }
+        prev = v;
+      }
+      return keys;
+    };
 
     // ---- frame loop
     K._frame = null;
@@ -463,15 +519,17 @@
     // cursor element (screen space, constant size — never scaled by the camera)
     let cursorEl = null;
     K.cursorSize = opts.cursorSize ?? 64;
+    K.cursorTip = opts.cursorTip ?? [6.5 / 32, 3.8 / 32]; // tip position as a fraction of the cursor box
     function drawCursor(t) {
       if (!cursorEl || !K._cursor) return;
       if (global.__NO_CURSOR__) { cursorEl.style.cssText = 'display:none'; return; } // review.py motion check
       const c = K.cursorAt(t);
       const s = 1 - 0.14 * clamp(c.press);
+      const tx = K.cursorSize * K.cursorTip[0], ty = K.cursorSize * K.cursorTip[1];
       K.css(cursorEl, {
         position: 'absolute', left: 0, top: 0, width: K.cursorSize, height: K.cursorSize, zIndex: 50,
-        transform: `translate(${c.x.toFixed(2)}px, ${c.y.toFixed(2)}px) scale(${s.toFixed(4)})`,
-        transformOrigin: '6px 4px', pointerEvents: 'none',
+        transform: `translate(${(c.x - tx).toFixed(2)}px, ${(c.y - ty).toFixed(2)}px) scale(${s.toFixed(4)})`,
+        transformOrigin: `${tx.toFixed(2)}px ${ty.toFixed(2)}px`, pointerEvents: 'none',
       });
     }
     // debug HUD for review frames (?hud=1 or window.__HUD__)
@@ -574,8 +632,18 @@
         const op = effOpacity(el);
         if (op < 0.35) continue;
         range.selectNodeContents(node);
-        const r = range.getBoundingClientRect(); // the glyphs, not the (maybe wider) element box
-        if (r.width === 0) continue;
+        const g = range.getBoundingClientRect(); // the glyphs, not the (maybe wider) element box
+        // clip by overflow ancestors between the text and the shape (digit strips, masks);
+        // the shape's own clip is what the checks below measure, so stop there
+        let r = { left: g.left, right: g.right, top: g.top, bottom: g.bottom };
+        for (let a = el; a && a !== shape && a !== K.stage; a = a.parentElement) {
+          const cs = getComputedStyle(a);
+          if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') {
+            const ar = a.getBoundingClientRect();
+            r = { left: Math.max(r.left, ar.left), right: Math.min(r.right, ar.right), top: Math.max(r.top, ar.top), bottom: Math.min(r.bottom, ar.bottom) };
+          }
+        }
+        if (r.right - r.left < 0.5 || r.bottom - r.top < 0.5) continue; // fully clipped: not visible
         const er = el.getBoundingClientRect();
         const scale = el.offsetWidth ? er.width / el.offsetWidth : 1;
         const fs = parseFloat(getComputedStyle(el).fontSize) * scale;

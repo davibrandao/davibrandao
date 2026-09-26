@@ -1,8 +1,9 @@
 # State recipes
 
 Sizes are world px at real 1× UI scale, and the camera zooms them. "Carries" names the part
-that should survive into or out of the state. Code for the first 13 lives in
-`examples/reference.html`. The rest follow the same patterns.
+that should survive into or out of the state. Code for the reference's 12 states, plus the
+scrub interaction inside the player, lives in `examples/reference.html`. The rest follow the
+same patterns.
 
 ## Contents
 - Built in the reference: button · loader · check · dynamic island · music player ·
@@ -57,9 +58,10 @@ on a fast spring and the trailing edge on a slow one. The track color springs ov
 Sound: toggle.
 
 **Tabs (segmented, liquid indicator)**: a 344×56 black pill with four 84-wide segments. The
-indicator is the knob stretched into a white pill under a tab. The labels are 15/500 gray,
-plus an **ink copy clipped to the indicator rect** (`clip-path: inset()`), so the inversion
-follows the liquid edges pixel for pixel. Clicking another tab sends the leading edge first.
+indicator is the knob stretched into a white pill under a tab. The labels are 15/500 gray
+outside the indicator and ink inside it: two copies with **complementary clips** from
+`K.splitClip`, so the inversion follows the liquid edges pixel for pixel. Clicking another
+tab sends the leading edge first.
 
 **Chart (draws itself, tooltip on hover)**: a 380×300 r 32 black card. The tab row springs up
 into the header over a faint track pill. The value is 30/600 tabular and counts up with
@@ -94,9 +96,9 @@ rows moves a highlight (edge springs). Selecting collapses it back to a pill wit
 value, with the value text swapping by blur. Sounds: click, tick per hover step, pop_down.
 
 **Stepper / quantity**: a 160×52 pill with − · value · +. Each click on + rolls the digit up.
-Each digit is a vertical strip of 0–9 in a clipped cell, and its `translateY` springs to
-`-digit × lineHeight`. Tabular numbers. The + button squishes. Clicks on consecutive beats
-make a nice beat run.
+Each digit is a vertical strip of 0–9 in an `overflow: hidden` cell, and its `translateY`
+springs to `-digit × lineHeight`. The audit ignores the clipped digits. Tabular numbers.
+The + button squishes. Clicks on consecutive beats make a nice beat run.
 
 **Text field**: a 320×52 white field with a 1.5 px border (ink 12 % → ink 60 % on focus, no
 glow). The caret stays solid while typing. Characters appear instantly on 16ths.
@@ -122,9 +124,12 @@ body line, time). Dismissing swipes the content left and collapses the card.
 spreads them apart (gaps spring open) and the pill widens. A "+3" chip rolls in.
 
 **Date picker**: the pill grows into a 280×300 card with a month label and a 7×5 grid of
-32 px day cells. Hovering moves a round highlight (edge springs, stretching between
-cells). Clicking sets a start, dragging extends a range pill across cells, and releasing
-confirms. The card collapses into a "Mar 12 – 16" pill.
+32 px day cells. The hover dot moves between cells with *all edges on one spring*. Liquid
+lead/trail edges only work along one axis, and on a diagonal path they pile up into a
+blob. Clicking sets a start. Dragging extends a range pill along the row (lead/trail is
+fine here), with each cell step snapped to 16ths via `K.steps` and a tick per step. Numbers
+under the pill invert with `K.splitClip`. Releasing confirms. The card collapses into a
+"May 12 – 16" pill.
 
 **Upload / drop zone**: a 300×160 card with a dashed 1.5 px border (a dash is fine, but no
 gradients). A file chip drops in, a progress bar fills on beats, and it resolves into a

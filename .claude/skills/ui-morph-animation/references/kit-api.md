@@ -29,8 +29,11 @@ const K = MorphKit.create({ bpm: 120, bars: 7, beatsPerBar: 4, beats: null, loop
 - `K.b(n)` converts beats to seconds (fractional beats allowed). `K.toBeat(t)` is the inverse.
 - `K.bb(bar, beat, frac)` converts a 1-based bar.beat to a beat index.
 - `K.T` is the loop length in seconds, and `K.beat` is one beat in seconds.
-- `K.label(t)` returns a "bar.beat" string. `K.since(t, beat)` returns the seconds since
-  that beat, wrapped into [-T/2, T/2) so it's loop-aware.
+- `K.label(t)` returns a "bar.beat" string.
+- `K.since(t, beat, fromBeat?)` returns loop-aware seconds since `beat`. t is read inside a
+  one-loop window starting at `fromBeat` (default: half a loop before the event). Pass the
+  beat the element appears. A toast visible from beat 26 whose icon draws at 27 uses
+  `K.since(t, 27, 26)`, and it stays drawn across the seam.
 - `K.event(beat, label)` registers the beat sheet (review.py lists it and checks the grid).
 - `K.cue(beat, sound, gain = 1)` registers a UI sound. The mixer lines the sound's peak up
   on the cue.
@@ -76,8 +79,8 @@ W(t); W.vel(t);
 - To park a hidden element, add a key at a beat where it's invisible (often `[0, …]`)
   holding where it will next appear.
 - `K.trackN(keys, sp)` takes vector values (`[beat, [x, y, w]]`), each component a track.
-- `K.colorTrack(keys, sp)` takes `'#hex'` or `'rgb()'` keys, springs them in OKLab, and
-  `f(t, alpha)` returns a CSS color.
+- `K.colorTrack(keys, sp)` takes `'#hex'`, `'#rrggbbaa'`, `'rgb()'` or `'rgba()'` keys. It springs
+  them in OKLab, alpha included, and `f(t, alphaMul)` returns a CSS color.
 
 ## 4. Edges (liquid indicators)
 
@@ -102,6 +105,8 @@ K.css(el, { ...K.swap(v, { blur: 14, scale: 0.94, dy: 0 }), left: x, top: y });
   Stagger siblings by adding 0.03–0.05 s per item.
 - `null` for inBeat means "always entered", and `null` for outBeat means "never exits".
   Windows that cross the loop seam work (`[26, 28]` exits after the wrap).
+- `{ instant: true }` appears exactly on the beat with no fade, for keystrokes, a caret
+  or a badge count. The exit is still the quick blur.
 - `K.swap` returns `opacity`, `filter: blur()`, `transform: translate/scale`, and
   `visibility`. Blur is specified in **screen** px and divided by the camera zoom, so it
   looks the same at every zoom.
@@ -109,6 +114,16 @@ K.css(el, { ...K.swap(v, { blur: 14, scale: 0.94, dy: 0 }), left: x, top: y });
   transform comes first).
 - `K.layer(el, group, vFn)` registers layers that share a spot, so the audit can flag two
   of them visible at once.
+- `K.textAt(el, x, y, size, anchor, v, extra, swapOpts)` positions text in world px. The
+  anchor is `'l'` (left edge at x), `'r'` (right edge at x) or `'c'` (centered), y is the
+  vertical center, and the blur swap for `v` is applied. `extra` overrides anything
+  (color, weight, clipPath…).
+- `K.iconAt(el, x, y, size, v, color, extra)` places a size×size box centered at (x, y), with
+  `color` feeding `currentColor`.
+- `K.splitClip(boxLeft, boxWidth, L, R, boxHeight?)` returns `{ inside, outside }`
+  clip-path strings for a label whose box starts at `boxLeft` (world px), given a fill
+  spanning [L, R]. Put `outside` on the base copy and `inside` on the inverted copy. No
+  glyph is drawn twice, so there is no halo, even white over ink on an accent fill.
 
 ## 6. Camera
 
@@ -133,8 +148,10 @@ K.cursorAt(t)  // → { x, y (screen), world: [x, y], press (0..1 spring), down 
 - The cursor stops at each key (minimum-jerk, peak speed a little early, and a slight arc
   unless `drag`). Two keys with the same anchor mean "hold". The segment from the last key
   to the first wraps across the loop.
-- It's drawn in screen space at a constant size, with a squish while pressed.
-  `window.__NO_CURSOR__` hides it (review uses this).
+- It's drawn in screen space at a constant size, with a squish while pressed. The arrow's
+  tip sits exactly on the anchor (`K.cursorTip`, a fraction of the box; set `cursorTip`
+  in `create()` if you pass your own `cursorSvg`). `window.__NO_CURSOR__` hides it (review
+  uses this).
 
 ```js
 const vol = K.drag({ press: 13, release: 15, map: (p, t) => clamp(v0 + (p[0] - x0) / 300),
@@ -148,6 +165,15 @@ const vol = K.drag({ press: 13, release: 15, map: (p, t) => clamp(v0 + (p[0] - x
   continuous. For a moving handle, use a function anchor.
 - Rubber band past limits: `MorphKit.rubber(x, lo, hi, dim, c = 0.55)`, or compute the
   overshoot in px and feed it to a stretch value (see the reference's volume slider).
+
+```js
+const keys = K.steps((t) => cellAt(K.cursorAt(t).world), 7, 9, { grid: 0.25, label: (c) => `cell ${c}`, sound: 'tick' });
+```
+- `K.steps(fn, fromBeat, toBeat, o)` samples a continuous value on every grid point (16ths
+  by default) and returns `[[beat, value], …]` only where it changes. It registers an event
+  and a sound cue per change when `label` or `sound` is given. Use it for drags over
+  discrete things (calendar cells, detents, stepper values), so each step lands on the grid
+  instead of wherever the cursor happens to cross. Feed the keys into your tracks.
 
 ## 8. Writing styles
 

@@ -1,6 +1,7 @@
 ---
 name: ui-morph-animation
 description: Make Dribbble-level looping UI motion videos where ONE shape morphs through 8–12 UI states (button, loader, check, dynamic island, music player, slider, toggle, tabs, chart, ⌘K palette, toast…) with a cursor doing real clicks and drags, cut to a song's beat grid. Builds a single 1440×1440 HTML animation in which every frame is a pure function of time (closed-form springs), analyzes the song with numpy for tempo and downbeats, places UI sounds by their measured peak, reviews one frame per beat, and renders a 60 fps motion-blurred MP4 with Playwright + ffmpeg. Use this whenever someone wants a UI animation, product motion shot, morphing-interface video, micro-interaction reel, beat-synced or music-synced UI animation, or a Dribbble/Instagram motion post, or pastes a prompt about a shape becoming different UI states on the beat, even if they never say "skill" or spell out the steps.
+compatibility: Python 3.9+ with numpy, pillow and playwright; ffmpeg on PATH (or pip imageio-ffmpeg); a Chromium that Playwright can launch (the scripts also find common preinstalled paths).
 ---
 
 # UI morph animation
@@ -44,15 +45,23 @@ below working together, and most new states are variations of something in it.
 
 ### 1. Ask for the inputs, and nothing else yet
 
-Ask for three things in one message. Offer sensible defaults so the user can answer fast:
-1. **8–12 UI states** for the shape to become, in order. Examples: button, loader, check,
-   dynamic island, player, slider, toggle, tabs, chart, command palette, toast. If they
-   give fewer, propose a chain. See `references/state-recipes.md` for what works.
-2. **Pure black and white, or one accent color** (a hex value).
-3. **A royalty-free song around 120 BPM**, as a file path or a URL (Mixkit and similar
-   sites are free for commercial use; tell them to check the track's license page). If a
-   download is blocked, ask them to upload the file. If they don't have a song yet, offer
-   `scripts/placeholder_track.py` to rough out the timing and swap the real track in later.
+Ask for three things in one message. Give each a default so "defaults" is a complete
+answer:
+1. **8–12 UI states** for the shape to become, in order. The default is the reference's
+   12: button → loader → check → dynamic island → music player → volume slider → toggle →
+   tabs → chart → ⌘K pill → command palette → toast (→ button). Scrubbing, typing and
+   hovering are interactions inside states, not extra states. If the user describes the
+   idea loosely ("a button that turns into a bunch of components"), offer the default
+   and a few alternatives from `references/state-recipes.md`.
+2. **Pure black and white (the default), or one accent color** as a hex value.
+3. **A royalty-free song around 120 BPM**, as a local path or a URL, or by dropping the file
+   into the working folder. Mixkit tracks are free for commercial use in videos, but still
+   point the user to the track's license page. If a download is blocked, ask for the file.
+   With no song yet, the default is `scripts/placeholder_track.py` (a synthetic groove) for
+   timing. The real track swaps in later with a re-analysis.
+
+Also mention the output format once: a 1440×1440 square MP4 at 60 fps with sound, plus a
+self-contained HTML file. The loop runs about 1.2 s per state at 120 BPM.
 
 If the user already gave all three, skip straight to step 2. Don't write animation code
 before step 3 is approved.
@@ -64,12 +73,19 @@ pip install numpy pillow playwright   # plus ffmpeg on PATH (or: pip install ima
 python3 scripts/analyze_beats.py song.mp3 --bars 7 --bpm-hint 120 --out beats.json
 ```
 
-Choose `--bars` so there are about 2–2.5 beats per state: 12 states → 7 bars, 8 states →
-5 bars (at 120 BPM, 7 bars = 14 s). Read the summary. It reports the tempo, whether the
-tempo is steady, the downbeat confidence, and the chosen loop start (a downbeat at a phrase
-boundary, in a high-energy stretch). Tell the user the BPM and where in the song the loop
-starts. If the downbeat confidence is low or the tempo drifts, say so. Fixes are
-`--downbeat-shift N` or `--start 32.5` / `--start bar:17`. Details are in `references/audio.md`.
+Choose `--bars` by counting interactions, not states. A morph takes about 1 beat, and so
+does each click, drag step or typing burst. A range selection or other multi-step drag
+takes 3–5 beats. Round the total up to whole bars. The reference's 12 states with their
+interactions come to 28 beats, which is 7 bars (14 s at 120 BPM). Eight states usually
+land at 5–6 bars.
+
+Read the summary. It reports the tempo, whether the tempo is steady, the downbeat
+confidence, the chosen loop start (a downbeat at a phrase boundary, in a high-energy
+stretch), and how much the loop-crossfade half beat dips. Tell the user the BPM and where
+in the song the loop starts. If the downbeat confidence is low, the tempo drifts, or the
+seam dips audibly, say so. Fixes are `--downbeat-shift N`, `--start 32.5`, or
+`--start bar:17`. If you change the bar count after the plan, re-run the analysis, because
+the best start depends on the loop length. Details are in `references/audio.md`.
 
 ### 3. Show the state list on the beat grid, and wait
 
@@ -87,9 +103,11 @@ python3 scripts/new_project.py morph-loop --beats beats.json --song song.mp3 [--
 ```
 
 This writes `index.html` (the beat grid is already in `CONFIG`), `morph-kit.js`, the
-font, a UI sound kit, and a music-only `mix.wav`. Pass `--from-example` when the chosen
-states overlap the reference: deleting and re-timing is faster than starting blank. Build
-in the reference's order, because each layer depends on the one before:
+font, a UI sound kit, and a music-only `mix.wav`. Pass `--from-example` only when most of
+the chosen states are the reference's. Its 28-beat timeline must be re-timed for any other
+length, and the script warns you. Otherwise, start from the template and copy patterns out
+of the reference. Both use the same layout: content in world px under `#origin`, inside the
+one `#shape`. Build in this order, because each layer depends on the one before:
 
 1. `PLAN`: the beat sheet from step 3, registered with `K.event()`. Add sounds with `K.cue()`.
 2. `GEO`: the one shape per state (w, h, r, bg, optional cx/cy), turned into tracks.
@@ -99,18 +117,21 @@ in the reference's order, because each layer depends on the one before:
 6. `vis`: the presence windows (enter and exit) for each content layer.
 7. `frame(t)`: write every dynamic style, every frame.
 
-Keep `python3 scripts/serve.py morph-loop` running to scrub in a browser (space plays with
-sound, ←/→ steps a beat, shift+←/→ steps a frame).
+You can't watch a browser, so you see frames through `review.py` (step 5). Use `--at` for
+single moments and `--range A:B:STEP` for a filmstrip of a transition. For the user,
+`python3 scripts/serve.py morph-loop` serves a live preview (space plays with sound, ←/→
+steps a beat, shift+←/→ steps a frame).
 
 ### 5. Review one frame per beat before the full render
 
 ```bash
-python3 scripts/review.py morph-loop/index.html --mid          # add --at 12.5,19.25 for close-ups
+python3 scripts/review.py morph-loop/index.html --mid     # + --at 12.5,19.25 close-ups, --range 18.75:19.75:0.125 filmstrip
 ```
 
 Open `review/sheet.png` (one row per bar, beat and half-beat) with the Read tool, then
-open individual `review/beat_XX.png` or `at_*.png` frames at full size. Fix anything off the
-grid, cramped, or hard to read. The report also checks:
+open individual `review/beat_XX.png` or `at_*.png` frames at full size, and a
+`strip_A-B.png` for any transition that matters. Close-ups and strips are kept across runs.
+Fix anything off the grid, cramped, or hard to read. The report also checks:
 - **purity**: frames rendered out of order must be identical.
 - **seam**: the loop point must look like any other frame step, cursor included.
 - **activity**: flags dead beats and quiet beats.
@@ -157,8 +178,8 @@ zoom, and a label.
    a 16th. Each UI sound's measured peak (not its first sample) lands on its cue.
 6. **The loop closes by construction.** In the kit, a track's value before its first key
    is its last key, and springs started near the end keep settling after the wrap. For
-   anything else that runs "since an event", use `K.since(t, beat)` so a toast icon drawn
-   at beat 27 is still drawn at t = 0.1.
+   anything else that runs "since an event", use `K.since(t, beat, appearBeat)` so a toast
+   icon drawn at beat 27 is still drawn at t = 0.1.
 7. **Render one frame per beat first** (`review.py`), then the full render.
 
 ## Kit cheat sheet
@@ -170,8 +191,11 @@ K.event(2, 'click → loader'); K.cue(2, 'click', 0.9);            // beat sheet
 const W = K.track([[0, 204], [2, 56], [6, 220]], SP.morph);       // [beat, value|fn(t), spring?]
 const BG = K.colorTrack([[0, '#0B0B0C'], [5, '#FFFFFF']], SP.color);
 const ind = K.edges([[18, 84, 168], [19, -84, 0]]);               // → [left, right], leading edge fast
-const v = K.presence(t, inBeat, outBeat, { delay: 0.06 });        // 0..1 visibility, fast exit
-K.css(label, { ...K.swap(v), left: x, top: y });                   // blur swap, blur sized in screen px
+const v = K.presence(t, inBeat, outBeat, { delay: 0.06 });        // 0..1 visibility, fast exit ({instant:true} for keys)
+K.textAt(label, x, y, 15, 'l', v, { fontWeight: 500 });            // text at world px with a blur swap (K.iconAt for icons)
+const clip = K.splitClip(boxLeft, boxW, L, R);                     // halo-free inversion under a moving fill
+const cellKeys = K.steps((t) => cellUnderCursor(t), 7, 9, { sound: 'tick' }); // snap a drag's steps to 16ths
+const drawn = clamp(K.since(t, 27, 26) / 0.3);                     // loop-aware "since beat 27", element appears at 26
 K.camera([[0, 3.7], [2, 6.2], [24, 3.05, 0, 108]], SP.cam);       // [beat, zoom, cx, cy, spring?]
 K.cursor([[0.75, [50, 12]], [2, [50, 12]], [9, (t) => thumbAt(t)]], [[1.75, 2], [10, 11.5]]);
 const prog = K.drag({ press: 10, release: 11.5, map: (p) => clamp((p[0] + 124) / 248), before: playing });
@@ -196,9 +220,16 @@ The full API, with the reasons behind each default, is in `references/kit-api.md
   position.
 - **The camera lags on purpose, but never overfills.** Zoom out on a fast spring when the
   shape grows, and zoom in on a slow one.
-- **Layers share one centered cell.** With CSS grid centering, use
-  `grid-template: minmax(0,1fr) / minmax(0,1fr)`, or the widest layer pushes the others
-  off-center. Or position everything in world coordinates, as the reference does.
+- **Drags over discrete things snap on the grid.** The cursor crosses calendar cells or
+  detents at arbitrary times. Sample the value on 16ths with `K.steps` and drive the UI and
+  sounds from those keys.
+- **Liquid edges are for one axis.** A highlight moving diagonally (a calendar hover) must
+  move all edges on the same spring, or the lead/trail lag piles into a blob.
+- **Inverting labels under a moving fill:** give the base copy `clip.outside` and the
+  inverted copy `clip.inside` from `K.splitClip`. Stacking an unclipped copy leaves a halo.
+- **If you center layers with CSS grid**, use `grid-template: minmax(0,1fr) / minmax(0,1fr)`,
+  or the widest layer pushes the others off-center. World coordinates under `#origin`
+  avoid the problem.
 - **Keep icons in one family and one visual stroke weight.** `MorphKit.icon(name, px,
   stroke)` normalizes the stroke across sizes. Filled media glyphs get the same rounded
   join treatment.

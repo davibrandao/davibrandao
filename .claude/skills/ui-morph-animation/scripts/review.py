@@ -14,10 +14,11 @@ Checks:
   audit     small text, text outside the shape, truncated text, two swap layers
             half-visible at once, shape crowding the frame edge
 
-usage: review.py PROJECT/index.html [--out review] [--mid] [--at BEATS] [--fps 60] [--tile 360] [--quick]
-  --mid        also render half-beat frames (where most transitions are mid-flight)
-  --at 3.5,12  render extra frames at these beats (full size) for a closer look
-  --quick      frames + sheet only, skip the checks
+usage: review.py PROJECT/index.html [--out review] [--mid] [--at BEATS] [--range A:B:STEP] [--fps 60] [--tile 360] [--quick]
+  --mid            also render half-beat frames (where most transitions are mid-flight)
+  --at 3.5,12      render extra full-size frames at these beats (kept across runs)
+  --range 5:6:0.125  filmstrip of a transition: frames from beat 5 to 6 every 1/8 beat → strip_5-6.png
+  --quick          frames + sheet only, skip the checks
 """
 import argparse
 import base64
@@ -44,6 +45,7 @@ def main():
     ap.add_argument("--out", default=None)
     ap.add_argument("--mid", action="store_true")
     ap.add_argument("--at", default="")
+    ap.add_argument("--range", default="", help="A:B:STEP in beats, e.g. 5:6:0.125")
     ap.add_argument("--fps", type=int, default=60)
     ap.add_argument("--tile", type=int, default=360)
     ap.add_argument("--quick", action="store_true")
@@ -59,8 +61,9 @@ def main():
     proj = html.parent
     out = Path(a.out).resolve() if a.out else proj / "review"
     out.mkdir(parents=True, exist_ok=True)
-    for old in out.glob("*.png"):
-        old.unlink()
+    for old in list(out.glob("beat_*.png")) + [out / "sheet.png"]:  # close-ups and strips are kept
+        if old.exists():
+            old.unlink()
     httpd, base = serve(proj)
     url = f"{base}/{html.name}"
     report = []
@@ -98,6 +101,21 @@ def main():
         for b in [float(x) for x in a.at.split(",") if x.strip()]:
             page.evaluate("b => K.seek(K.b(b))", b)
             (out / f"at_{b:g}.png").write_bytes(grab(cdp))
+        if a.range:
+            r0, r1, st = [float(x) for x in a.range.split(":")]
+            n = int(round((r1 - r0) / st)) + 1
+            strip = []
+            for i in range(n):
+                b = r0 + i * st
+                page.evaluate("b => K.seek(K.b(b))", b)
+                strip.append(Image.open(io.BytesIO(grab(cdp))).convert("RGB").resize((a.tile, a.tile), Image.LANCZOS))
+            cols = min(n, 8)
+            rows_ = (n + cols - 1) // cols
+            sh = Image.new("RGB", (cols * a.tile + (cols + 1) * 8, rows_ * a.tile + (rows_ + 1) * 8), (255, 255, 255))
+            for i, im in enumerate(strip):
+                rr, cc = divmod(i, cols)
+                sh.paste(im, (8 + cc * (a.tile + 8), 8 + rr * (a.tile + 8)))
+            sh.save(out / f"strip_{r0:g}-{r1:g}.png")
         cols = bpb * len(steps)
         rows = (len(tiles) + cols - 1) // cols
         gap = 8

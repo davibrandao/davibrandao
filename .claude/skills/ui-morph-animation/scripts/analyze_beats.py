@@ -303,6 +303,18 @@ def analyze(path, bars=7, hint=120.0, start=None, shift=None):
         sec_beats = np.concatenate([sec_beats, sec_beats[-1] + P * np.arange(1, nbeats + 2 - len(sec_beats))])
     strength = at_beats(env + 0.5 * low)[i0:i0 + nbeats]
     strength = (strength / (strength.max() + 1e-9)).round(3)
+    # the mixer crossfades the loop's last half beat with the half beat before the start:
+    # how much quieter does that make the seam than the loop's own tail?
+    hb = int(P / 2 * SR)
+    s_i, e_i = int(sec_beats[0] * SR), int(sec_beats[-1] * SR)
+    tail = x[max(0, e_i - hb):e_i]
+    pre = x[max(0, s_i - hb):s_i]
+    if len(pre) < len(tail):
+        pre = np.concatenate([np.zeros(len(tail) - len(pre), np.float32), pre])
+    u = np.linspace(0, 1, len(tail))
+    xf = tail * np.cos(u * np.pi / 2) + pre[:len(tail)] * np.sin(u * np.pi / 2)
+    rms = lambda v: float(np.sqrt(np.mean(np.square(v, dtype=np.float64))) + 1e-9)  # noqa: E731
+    xfade_dip = round(20 * np.log10(rms(xf) / rms(tail)), 1)
 
     return {
         "file": str(path), "duration": round(dur, 3),
@@ -320,6 +332,7 @@ def analyze(path, bars=7, hint=120.0, start=None, shift=None):
             "end": round(float(sec_beats[-1]), 4), "duration": round(float(sec_beats[-1] - sec_beats[0]), 4),
             "beats_rel": [round(float(t - sec_beats[0]), 5) for t in sec_beats],
             "beat_strength": [float(v) for v in strength],
+            "xfade_dip_db": xfade_dip,
         },
     }
 
@@ -353,6 +366,9 @@ def main():
     print(f"loop      bar {s['start_bar']} @ {s['start']:.3f}s → {s['bars']} bars = {s['duration']:.3f}s "
           f"(ends {s['end']:.3f}s)")
     print("           beat strength: " + spark(s["beat_strength"]))
+    dip = s["xfade_dip_db"]
+    print(f"seam      the loop-crossfade half beat is {dip:+.1f} dB vs the loop's own tail"
+          f"{'  ← audible dip: try another candidate, or mix with --xfade-beats 0.25' if dip < -6 else ' (fine)'}")
     print("candidates (bar, start, score, energy, loop-sim, boundary):")
     for c in r["candidates"][:5]:
         print(f"  bar {c['bar']:>3}  {c['start']:>8.3f}s  {c['score']:+.3f}  e={c['energy']:.2f} "

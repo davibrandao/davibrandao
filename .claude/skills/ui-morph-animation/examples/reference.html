@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Morph loop — reference</title>
+<!--
+  Reference build: 7 bars at 120 BPM, something on every beat.
+  button → loader → check → dynamic island → player (play/pause morph) → scrub →
+  volume slider (stretches past max) → toggle → liquid tab indicator → chart (draws,
+  tooltip) → ⌘K → type to filter → enter → toast → button.
+  Everything is a function of t: read PLAN (the beat sheet), then GEO (the one shape),
+  then the driven values, then frame(t).
+-->
+<style>
+  @font-face { font-family: 'Geist'; src: url('Geist-Variable.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
+  html, body { margin: 0; background: #ECEAE6; }
+  #stage {
+    position: relative; width: 1440px; height: 1440px; overflow: hidden; background: #ECEAE6;
+    font-family: 'Geist', system-ui, sans-serif; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;
+  }
+  /* No will-change anywhere under #world: the camera scales it and text must re-rasterize crisp. */
+  #world { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+  #shape { position: absolute; overflow: hidden; }
+  #origin { position: absolute; width: 0; height: 0; }
+  #origin > * { position: absolute; }
+  .t { white-space: nowrap; letter-spacing: -0.01em; }
+  .num { font-variant-numeric: tabular-nums; }
+  svg { display: block; overflow: visible; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="world">
+    <div id="shape" data-shape>
+      <div id="origin">
+        <div id="blob"></div>
+        <div id="thumb"></div>
+        <div id="trackBg"></div>
+        <div id="tabsTrack"></div>
+        <!-- button -->
+        <div id="btnLabel" class="t" data-name="button"><span id="btnIcon"></span><span>Download</span></div>
+        <!-- loader / check -->
+        <svg id="ring" width="28" height="28" viewBox="0 0 28 28" data-name="loader">
+          <circle cx="14" cy="14" r="11" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="2.4"/>
+          <circle id="ringArc" cx="14" cy="14" r="11" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" transform="rotate(-90 14 14)"/>
+        </svg>
+        <svg id="check" width="28" height="28" viewBox="0 0 24 24" data-name="check"><path id="checkPath" d="M5.5 12.5l4.3 4.3L18.5 8" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <!-- island + player -->
+        <div id="art"><svg width="100%" height="100%" viewBox="0 0 52 52" preserveAspectRatio="none">
+          <rect id="artBg" width="52" height="52"/>
+          <path d="M10 37 A16 16 0 0 1 42 37 Z" fill="#0B0B0C"/>
+          <rect id="artS1" x="8" y="28" width="36" height="1.8"/><rect id="artS2" x="8" y="32.4" width="36" height="2.2"/>
+          <rect x="7" y="39.5" width="38" height="1.6" fill="#0B0B0C"/>
+        </svg></div>
+        <div id="eq"><i></i><i></i><i></i><i></i><i></i></div>
+        <div id="title" class="t" data-name="title">Midnight Drive</div>
+        <div id="artist" class="t" data-name="artist">Aurora Lane</div>
+        <div id="tL" class="t num">1:07</div>
+        <div id="tR" class="t num">-2:09</div>
+        <svg id="prev" width="22" height="22" viewBox="0 0 24 24"><path d="M18.6 6.4v11.2L9.8 12zM5.4 6.4h2.6v11.2H5.4z"/></svg>
+        <svg id="pp" width="30" height="30" viewBox="0 0 30 30"><path id="ppPath"/></svg>
+        <svg id="next" width="22" height="22" viewBox="0 0 24 24"><path d="M5.4 6.4v11.2L14.2 12zM16 6.4h2.6v11.2H16z"/></svg>
+        <!-- volume slider -->
+        <div id="volLo"></div>
+        <div id="volHi"></div>
+        <!-- tabs + chart -->
+        <div class="t tab" data-name="tab-day">Day</div><div class="t tab" data-name="tab-week">Week</div>
+        <div class="t tab" data-name="tab-month">Month</div><div class="t tab" data-name="tab-year">Year</div>
+        <div class="t tabInk">Day</div><div class="t tabInk">Week</div><div class="t tabInk">Month</div><div class="t tabInk">Year</div>
+        <div id="value" class="t num" data-name="value">2,481</div>
+        <div id="valueSub" class="t" data-name="value-sub">plays this week</div>
+        <div id="delta" class="t num">+12.4%</div>
+        <svg id="plot" width="344" height="104" viewBox="-172 0 344 104">
+          <defs><clipPath id="reveal"><rect id="revealRect" x="-172" y="-20" width="0" height="140"/></clipPath></defs>
+          <line x1="-172" x2="172" y1="0.5" y2="0.5" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+          <line x1="-172" x2="172" y1="52" y2="52" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+          <line x1="-172" x2="172" y1="103.5" y2="103.5" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
+          <path id="area" clip-path="url(#reveal)"/>
+          <path id="line" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <line id="guide" y1="0" y2="104" stroke="rgba(255,255,255,.28)" stroke-width="1" stroke-dasharray="3 3"/>
+          <circle id="dot" r="5.2" stroke-width="2.6"/>
+        </svg>
+        <div id="days" class="t"></div>
+        <div id="tip"><span id="tipA" class="t num">Wed · 340</span><span id="tipB" class="t num">Fri · 612</span></div>
+        <!-- ⌘K + palette -->
+        <div id="sIcon"></div>
+        <div id="ph1" class="t" data-name="search-ph">Search…</div>
+        <div id="kbd" class="t"><span id="kbdIcon"></span>K</div>
+        <div id="ph2" class="t" data-name="palette-ph">Search commands…</div>
+        <div id="typed" class="t" data-name="typed"></div>
+        <div id="caret"></div>
+        <div id="divider"></div>
+        <div class="row"><span class="ri"></span><span class="rl t">Export chart</span><span class="rh t num">⌘E</span></div>
+        <div class="row"><span class="ri"></span><span class="rl t">Share link</span><span class="rh t num">⌘L</span></div>
+        <div class="row"><span class="ri"></span><span class="rl t">Export as CSV</span><span class="rh t num">⇧⌘E</span></div>
+        <div class="row"><span class="ri"></span><span class="rl t">Duplicate</span><span class="rh t num">⌘D</span></div>
+        <div class="row"><span class="ri"></span><span class="rl t">Delete</span><span class="rh t num">⌫</span></div>
+        <!-- toast -->
+        <svg id="toastIcon" width="22" height="22" viewBox="0 0 24 24"><circle id="tiC" cx="12" cy="12" r="9.2" fill="none" stroke-width="2" stroke-linecap="round" transform="rotate(-90 12 12)"/><path id="tiP" d="M8 12.4l2.8 2.8L16.2 9.6" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div id="toastText" class="t" data-name="toast">Chart exported</div>
+        <div id="toastUndo" class="t" data-name="toast-undo">Undo</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="morph-kit.js"></script>
+<script>
+/* CONFIG — written by new_project.py from the beat analysis. */
+const CONFIG = {"bpm": 120, "bars": 7, "beats": null, "accent": null, "audio": "mix.wav"};
+/* END CONFIG */
+
+const { spring, lerp, clamp, remap, minjerk, hash, mixHex, icon, playPause, smoothPath } = MorphKit;
+const K = MorphKit.create({ bpm: CONFIG.bpm, bars: CONFIG.bars, beats: CONFIG.beats });
+const B = K.b; // beats → seconds
+
+// ---------------------------------------------------------------- palette
+const INK = '#0B0B0C', PAPER = '#FFFFFF';
+const ACC = CONFIG.accent;                 // one accent, or null for pure black and white
+const HOVER = mixHex(INK, PAPER, 0.13);
+const OFF = '#B5B2AC';                     // toggle track, off
+const ON = ACC || INK;
+const KEYCAP = mixHex(PAPER, INK, 0.075);
+const FLASH = mixHex(PAPER, INK, 0.16);
+const W56 = 'rgba(255,255,255,.56)', W40 = 'rgba(255,255,255,.4)';
+const I45 = 'rgba(11,11,12,.45)', I60 = 'rgba(11,11,12,.6)', I40 = 'rgba(11,11,12,.4)';
+
+// ---------------------------------------------------------------- springs (tiny overshoot at most)
+const SP = {
+  morph: spring(0.55, 0.12), big: spring(0.62, 0.1), snap: spring(0.3, 0.1), press: spring(0.16, 0),
+  color: spring(0.45, 0), cam: spring(0.95, 0), camOut: spring(0.5, 0), lead: spring(0.3, 0.14), trail: spring(0.62, 0.04),
+  release: spring(0.5, 0.16), draw: spring(0.6, 0),
+};
+
+// ---------------------------------------------------------------- the beat sheet
+const PLAN = [
+  [0, 'button', 'toast → button'],   [1, null, 'hover'],            [2, 'loader', 'click → loader'],   [3, null, 'progress 46%'],
+  [4, null, 'progress 82%'],         [5, 'check', 'done → check'],  [6, 'island', 'check → island'],   [7, 'player', 'click → player'],
+  [8, null, 'play ▸ pause'],         [9, null, 'hover thumb'],      [10, null, 'grab thumb'],          [11, null, 'scrub'],
+  [12, 'slider', 'player → volume'], [13, null, 'drag volume'],     [14, null, 'past max: stretch'],   [15, null, 'release: spring back'],
+  [16, 'toggle', 'slider → toggle'], [17, null, 'toggle on'],       [18, 'tabs', 'knob → indicator'],  [19, null, 'tab: Week'],
+  [20, 'chart', 'chart draws'],      [21, null, 'tooltip'],         [22, null, 'tooltip → peak'],      [23, 'search', 'click → ⌘K'],
+  [24, 'palette', 'open palette'],   [25, null, 'type "exp"'],      [26, 'toast', 'enter → toast'],    [27, null, 'toast check'],
+];
+PLAN.forEach(([b, , label]) => K.event(b, label));
+[[0, 'pop', 0.45], [2, 'click'], [3, 'tick', 0.35], [4, 'tick', 0.35], [5, 'success', 0.8], [6, 'pop', 0.55],
+ [7, 'click'], [7, 'whoosh', 0.3], [8, 'click'], [10, 'tap', 0.7], [11.5, 'tick', 0.45], [12, 'pop_down', 0.55],
+ [13, 'tap', 0.7], [14, 'tick', 0.6], [15, 'thud', 0.7], [16, 'pop_down', 0.5], [17, 'toggle'], [18, 'pop', 0.5],
+ [19, 'click'], [20, 'whoosh', 0.45], [21, 'tick', 0.5], [22, 'tick', 0.5], [23, 'click'], [24, 'click'], [24, 'pop', 0.4],
+ [25, 'key1', 0.8], [25.25, 'key2', 0.8], [25.5, 'key3', 0.8], [26, 'enter'], [27, 'pop', 0.4],
+].forEach(([b, s, g]) => K.cue(b, s, g ?? 0.9));
+
+// ---------------------------------------------------------------- driven values
+// Playback progress: creeps after "play" (8), grabbed at 10, scrubbed, released at 11.5.
+const P0 = 0.34, SONG = 196;
+const playOn = K.track([[0, 0], [8, 1], [12, 0]], SP.snap);
+const progPlay = (t) => P0 + Math.max(0, t - B(8)) / SONG * 4;
+const TRACK_L = -124, TRACK_W = 248;
+const thumbAt = (t) => [TRACK_L + TRACK_W * progPlay(t), 14];
+let prog; // defined after the cursor (drags read the cursor)
+
+// Volume: grabbed at 13, dragged past max, released at 15. Past max it becomes stretch.
+const VOL_W = 300, VOL0 = 0.62;
+let vol, stretch;
+const rubberPx = (e, dim = 150) => (1 - 1 / ((e * 0.55) / dim + 1)) * dim;
+
+// Palette: rows, filtering and typing.
+const ROWS = ['Export chart', 'Share link', 'Export as CSV', 'Duplicate', 'Delete'];
+const ROW_ICONS = ['download', 'share', 'file', 'copy', 'trash'];
+const KEYS = [[25, 'e'], [25.25, 'x'], [25.5, 'p']];
+const typedAt = (t) => (t < B(24) || t >= B(26.2) ? '' : KEYS.filter(([b]) => t >= B(b)).map(([, c]) => c).join(''));
+const rowOut = [null, 25.25, null, 25.25, 25.25];        // rows that stop matching at "ex"
+const rowSlot = ROWS.map((_, i) => K.track(i === 2 ? [[0, 2], [25.25, 1]] : [[0, i]], SP.morph));
+const PAL_H = K.track([[0, 268], [25.25, 148]], SP.morph);
+
+// Chart data (a week) and its geometry.
+const DATA = [260, 380, 340, 480, 612, 430, 520], DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const PX = DATA.map((_, k) => -172 + (k * 344) / 6), PY = DATA.map((v) => 104 - (v / 700) * 104);
+
+// ---------------------------------------------------------------- the one shape
+const GEO = {
+  button:  { w: 204, h: 56, r: 28, bg: INK },
+  loader:  { w: 56, h: 56, r: 28, bg: INK },
+  check:   { w: 56, h: 56, r: 28, bg: ACC || PAPER },
+  island:  { w: 220, h: 56, r: 28, bg: INK },
+  player:  { w: 372, h: 196, r: 40, bg: INK },
+  slider:  { w: (t) => VOL_W + stretch(t), h: (t) => 56 - 0.1 * stretch(t), r: 28, cx: (t) => stretch(t) / 2, bg: INK },
+  toggle:  { w: 92, h: 56, r: 28, bg: OFF },
+  tabs:    { w: 344, h: 56, r: 28, bg: INK },
+  chart:   { w: 380, h: 300, r: 32, bg: INK },
+  search:  { w: 300, h: 52, r: 26, bg: PAPER },
+  palette: { w: 400, h: (t) => PAL_H(t), r: 22, cy: (t) => -26 + PAL_H(t) / 2, bg: PAPER },
+  toast:   { w: 300, h: 56, r: 28, bg: INK },
+};
+const SPRING_FOR = { player: SP.big, chart: SP.big, palette: SP.big };
+const stateKeys = (prop, dflt) => PLAN.filter((p) => p[1]).map(([b, s]) => [b, GEO[s][prop] ?? dflt, SPRING_FOR[s] || SP.morph]);
+const SW = K.track(stateKeys('w'), SP.morph), SH = K.track(stateKeys('h'), SP.morph), SR = K.track(stateKeys('r'), SP.morph);
+const SCX = K.track(stateKeys('cx', 0), SP.morph), SCY = K.track(stateKeys('cy', 0), SP.morph);
+const SBG = K.colorTrack([...stateKeys('bg'), [0.75, HOVER, SP.color], [17, ON, SP.color]].sort((a, b) => a[0] - b[0]), SP.color);
+const SQUISH = K.track([[0, 0], [1.75, 1], [2, 0], [6.75, 1], [7, 0], [23.75, 1], [24, 0]], SP.press);
+
+// ---------------------------------------------------------------- camera: each state fills the frame
+const CAM = [
+  [0, 3.7], [2, 6.2], [6, 4.4], [7, 3.25], [12, 3.4], [16, 5.8], [18, 3.55], [20, 3.3], [23, 3.85],
+  [24, 3.05, 0, 108], [25.25, 3.4, 0, 48], [26, 3.8],
+];
+// pull back as fast as the shape grows (or it overfills the frame); push in slowly, like an operator
+const zoomOut = (i) => CAM[i][1] < CAM[(i + CAM.length - 1) % CAM.length][1];
+K.camera(CAM.map(([b, z, cx = 0, cy = 0], i) => [b, z, cx, cy, zoomOut(i) ? SP.camOut : SP.cam]), SP.cam);
+
+// ---------------------------------------------------------------- cursor: real clicks and drags
+const BTN = [50, 12], ISL = [70, 10], PLAY = [4, 64], VOL_GRAB = [-150 + VOL0 * VOL_W, 6];
+const chartPt = (k) => [PX[k] + 6, PY[k] + 18]; // plot coords == world coords (plot top at y=0)
+K.cursor([
+  [0.75, BTN], [2, BTN], [2.75, [66, 58]], [5.75, [66, 58]], [6.5, ISL], [7, ISL],
+  [7.6, PLAY], [8, PLAY], [9, thumbAt], [10, thumbAt], [11.25, [TRACK_L + TRACK_W * 0.62, 14], { drag: true }],
+  [11.5, [TRACK_L + TRACK_W * 0.62, 14]], [12.75, VOL_GRAB], [13, VOL_GRAB], [14.75, [246, 6], { drag: true }],
+  [15, [246, 6]], [16.5, [10, 10]], [17, [10, 10]], [17.75, [30, 44]], [18.6, [-40, 10]], [19, [-40, 10]],
+  [20.9, chartPt(2)], [21.9, chartPt(4)], [23, chartPt(4)], [23.6, [52, 12]], [24, [52, 12]],
+  [24.75, [230, 70]], [27, [230, 70]],
+], [[1.75, 2], [6.75, 7], [7.75, 8], [10, 11.5], [13, 15], [16.75, 17], [18.75, 19], [22.75, 23], [23.75, 24]]);
+
+// drags: direct manipulation while held, spring back from wherever it was on release
+prog = K.drag({
+  press: 10, release: 11.5, before: progPlay, spring: SP.release, rest: (v) => clamp(v),
+  map: (p) => clamp(progPlay(B(10)) + (p[0] - thumbAt(B(10))[0]) / TRACK_W),
+});
+const volRaw = (p) => VOL0 + (p[0] - VOL_GRAB[0]) / VOL_W;
+vol = K.drag({ press: 13, release: 15, before: () => VOL0, map: (p) => clamp(volRaw(p)), rest: () => 1, spring: SP.release });
+stretch = K.drag({ press: 13, release: 15, before: () => 0, map: (p) => rubberPx(Math.max(0, volRaw(p) - 1) * VOL_W), rest: () => 0, spring: SP.release });
+const GRAB = K.track([[0, 0], [9, 0.55], [10, 1], [11.5, 0.55], [12, 0]], SP.snap);
+
+// ---------------------------------------------------------------- the blob: progress fill → volume fill →
+// toggle knob → liquid tab indicator → ⌘K keycap → highlighted row. One element, never cut.
+// keys: [beat, L, R, T, B, radius, springs]; the leading edge rides the fast spring.
+const lt = { l: SP.trail, r: SP.lead }, rt = { l: SP.lead, r: SP.trail };
+const BLOB = [
+  [0, TRACK_L, (t) => TRACK_L + TRACK_W * prog(t), (t) => 11 - 2 * GRAB(t), (t) => 17 + 2 * GRAB(t), 3],
+  [12, -150, (t) => -150 + vol(t) * (VOL_W + stretch(t)), (t) => -28 + 0.05 * stretch(t), (t) => 28 - 0.05 * stretch(t), 28, { all: SP.big }],
+  [16, -42, 6, -24, 24, 24],
+  [16.75, -42, 18, -24, 24, 24, { all: SP.snap }],
+  [17, -6, 42, -24, 24, 24, lt],
+  [18, 84, 168, -24, 24, 24, lt],
+  [19, -84, 0, -24, 24, 24, rt],
+  [20, -84, 0, -132, -84, 24, { all: SP.big }],
+  [23, 104, 142, -13, 13, 7, lt],
+  [24, -192, 192, 36, 72, 10, { all: SP.big }],
+];
+const blobTrack = (i, which) => K.track(BLOB.map((k) => [k[0], k[i], (k[6] && (k[6][which] || k[6].all)) || SP.morph]));
+const BL = blobTrack(1, 'l'), BR = blobTrack(2, 'r'), BT = blobTrack(3, 't'), BB = blobTrack(4, 'b'), BRAD = blobTrack(5, 'rad');
+const BCOL = K.colorTrack([[0, PAPER], [23, KEYCAP], [26, FLASH, SP.press]], SP.color);
+const BSHADOW = K.track([[0, 0], [16, 1], [18, 0]], SP.color);
+
+// knob-like inner elements that persist across states
+// island: pinned to the shape's growing edges (never poking out); player: fixed spots
+const ART = K.trackN([[0, [(t) => -SW(t) / 2 + 28, 0, 30, 9]], [7, [-138, -50, 52, 12]]], SP.big);  // cx, cy, size, radius
+const EQ = K.trackN([[0, [(t) => SW(t) / 2 - 30, 0, 13]], [7, [152, -50, 15]]], SP.big);            // cx, cy, max height
+const TAB_Y = K.track([[0, 0], [20, -108]], SP.big);
+const TIP_X = K.track([[0, PX[2]], [22, PX[4]]], SP.morph);
+const S_ICON_X = K.track([[0, -124], [24, -167]], SP.big);  // palette: same column as the row icons
+const LOAD = K.track([[0, 0.05], [2.5, 0.26], [3, 0.46], [4, 0.82], [4.75, 1]], SP.snap);
+const PLAYPAUSE = K.track([[0, 0], [8, 1]], SP.snap);
+const DRAW = (t) => SP.draw.step(K.since(t, 20) - 0.06);
+
+// ---------------------------------------------------------------- DOM
+const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
+const world = $('#world'), shape = $('#shape'), origin = $('#origin');
+const el = Object.fromEntries(['blob', 'thumb', 'trackBg', 'tabsTrack', 'btnLabel', 'ring', 'ringArc', 'check', 'checkPath', 'art',
+  'artBg', 'artS1', 'artS2', 'eq', 'title', 'artist', 'tL', 'tR', 'prev', 'pp', 'ppPath', 'next', 'volLo', 'volHi', 'value',
+  'valueSub', 'delta', 'plot', 'revealRect', 'area', 'line', 'guide', 'dot', 'days', 'tip', 'tipA', 'tipB', 'sIcon', 'ph1',
+  'kbd', 'kbdIcon', 'ph2', 'typed', 'caret', 'divider', 'toastIcon', 'tiC', 'tiP', 'toastText', 'toastUndo', 'btnIcon']
+  .map((id) => [id, document.getElementById(id)]));
+const tabs = $$('.tab'), tabsInk = $$('.tabInk'), rows = $$('.row'), bars = $$('#eq i');
+el.btnIcon.innerHTML = icon('arrowDown', 18, 2, 'currentColor');
+el.volLo.innerHTML = icon('volumeLow', 20, 2, 'currentColor');
+el.volHi.innerHTML = icon('volume', 20, 2, 'currentColor');
+el.sIcon.innerHTML = icon('search', 18, 2, 'currentColor');
+el.kbdIcon.innerHTML = icon('command', 12, 1.7, 'currentColor');
+rows.forEach((r, i) => { r.querySelector('.ri').innerHTML = icon(ROW_ICONS[i], 18, 1.8, 'currentColor'); });
+el.days.innerHTML = DAYS.map((d, k) => `<span style="position:absolute;left:${PX[k] + 178 - 10}px;width:20px;text-align:center">${d}</span>`).join('');
+el.artBg.setAttribute('fill', ACC || PAPER);
+el.artS1.setAttribute('fill', ACC || PAPER); el.artS2.setAttribute('fill', ACC || PAPER);
+const LINE_D = smoothPath(PX.map((x, k) => [x, PY[k]]), 1);
+el.line.setAttribute('d', LINE_D);
+el.area.setAttribute('d', `${LINE_D} L172,104 L-172,104 Z`);
+const LINE_LEN = el.line.getTotalLength();
+// y on the drawn curve for any x (sampled once — deterministic)
+const CURVE = Array.from({ length: 481 }, (_, i) => { const p = el.line.getPointAtLength((LINE_LEN * i) / 480); return [p.x, p.y]; });
+const curveY = (x) => { for (let i = 1; i < CURVE.length; i++) if (CURVE[i][0] >= x) { const [a, b] = [CURVE[i - 1], CURVE[i]]; return lerp(a[1], b[1], (x - a[0]) / (b[0] - a[0] || 1)); } return CURVE[CURVE.length - 1][1]; };
+
+// presence windows (enter, exit) in beats — exits are quick, enters trail slightly
+const vis = {
+  btn: (t) => K.presence(t, 0, 2), ring: (t) => K.presence(t, 2, 5), check: (t) => K.presence(t, 5, 6),
+  art: (t) => K.presence(t, 6, 12), eq: (t) => K.presence(t, 6, 12, { delay: 0.1 }),
+  title: (t) => K.presence(t, 7, 12, { delay: 0.1 }), artist: (t) => K.presence(t, 7, 12, { delay: 0.13 }),
+  prog: (t) => K.presence(t, 7, 12, { delay: 0.16 }), ctrl: (t) => K.presence(t, 7, 12, { delay: 0.2 }),
+  blob: (t) => K.presence(t, 7, 26, { delay: 0.16, outDelay: 0.05 }), thumb: (t) => K.presence(t, 9, 12, { delay: 0 }),
+  vol: (t) => K.presence(t, 12, 16, { delay: 0.12 }), tabs: (t) => K.presence(t, 18, 23, { delay: 0.08 }),
+  tabsTrack: (t) => K.presence(t, 20, 23, { delay: 0.1 }), chart: (t) => K.presence(t, 20, 23, { delay: 0.1 }),
+  days: (t) => K.presence(t, 20, 23, { delay: 0.3 }), tip: (t) => K.presence(t, 21, 23, { delay: 0 }),
+  tipA: (t) => K.presence(t, 21, 22, { delay: 0 }), tipB: (t) => K.presence(t, 22, 23, { delay: 0.04 }),
+  sIcon: (t) => K.presence(t, 23, 26), ph1: (t) => K.presence(t, 23, 24), kbd: (t) => K.presence(t, 23, 24, { delay: 0.2 }),
+  ph2: (t) => K.presence(t, 24, 25, { delay: 0.1 }), typed: (t) => K.presence(t, null, 26),
+  pal: (t) => K.presence(t, 24, 26, { delay: 0.12 }),
+  toast: (t) => K.presence(t, 26, 28, { delay: 0.12 }), undo: (t) => K.presence(t, 26, 28, { delay: 0.2 }),
+};
+// register the swaps that share a spot, so review.py can catch overlapping labels
+K.layer(el.btnLabel, 'center', vis.btn); K.layer(el.ring, 'center', vis.ring); K.layer(el.check, 'center', vis.check);
+K.layer(el.toastText, 'center', vis.toast); K.layer(el.ph1, 'input', vis.ph1); K.layer(el.ph2, 'input', vis.ph2);
+K.layer(el.typed, 'input', vis.typed); K.layer(el.tipA, 'tip', vis.tipA); K.layer(el.tipB, 'tip', vis.tipB);
+
+// ---------------------------------------------------------------- helpers
+const sw = (v, o) => K.swap(v, o);
+// text at world (x, y): anchor l = left edge at x, r = right edge at x, c = centred; y = vertical centre
+function text(e, x, y, size, anchor, v, extra = {}, swo) {
+  const box = { top: y - size * 0.6, height: size * 1.2, lineHeight: `${size * 1.2}px`, fontSize: size };
+  if (anchor === 'l') box.left = x; else if (anchor === 'r') box.right = -x; else { box.left = x - 150; box.width = 300; box.textAlign = 'center'; }
+  K.css(e, { position: 'absolute', ...box, ...sw(v, swo), ...extra });
+}
+function iconAt(e, x, y, size, v, color, extra = {}) {
+  K.css(e, { position: 'absolute', left: x - size / 2, top: y - size / 2, width: size, height: size, color, ...sw(v), ...extra });
+}
+const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+// ---------------------------------------------------------------- frame(t): every dynamic style, every frame
+K.onFrame((t) => {
+  K.css(world, { transform: K.worldTransform() });
+
+  // the shape
+  const w = SW(t), h = SH(t), cx = SCX(t), cy = SCY(t), sq = SQUISH(t);
+  K.css(shape, {
+    ...K.box(cx, cy, w, h, SR(t)), background: SBG(t), transform: `scale(${1 - 0.035 * sq})`,
+    boxShadow: '0 0.5px 1px rgba(0,0,0,.08), 0 10px 26px -14px rgba(0,0,0,.42)',
+  });
+  K.css(origin, { left: w / 2 - cx, top: h / 2 - cy });
+
+  // button
+  const vb = vis.btn(t);
+  K.css(el.btnLabel, { position: 'absolute', left: -110, width: 220, top: -12, height: 24, display: 'flex', alignItems: 'center',
+    justifyContent: 'center', gap: 8, fontSize: 17, fontWeight: 500, color: PAPER, ...sw(vb) });
+
+  // loader ring → check
+  const C = 2 * Math.PI * 11;
+  iconAt(el.ring, 0, 0, 28, vis.ring(t));
+  K.attr(el.ringArc, 'stroke-dasharray', `${(C * clamp(LOAD(t))).toFixed(3)} ${C}`);
+  iconAt(el.check, 0, 0, 28, vis.check(t));
+  const ck = clamp((K.since(t, 5) - 0.04) / 0.32);
+  K.attr(el.checkPath, 'stroke', ACC ? PAPER : INK);
+  K.attr(el.checkPath, 'stroke-dasharray', 20);
+  K.attr(el.checkPath, 'stroke-dashoffset', 20 * (1 - minjerk(ck)));
+
+  // island + player: art and equalizer persist and move
+  const [ax, ay, as, ar] = ART(t);
+  K.css(el.art, { left: ax - as / 2, top: ay - as / 2, width: as, height: as, borderRadius: ar, overflow: 'hidden', ...sw(vis.art(t)) });
+  const [ex, ey, eh] = EQ(t), on = clamp(playOn(t)), nb = Math.floor(K.toBeat(t)), since = t - B(nb);
+  K.css(el.eq, { left: ex - 13, top: ey - 10, width: 26, height: 20, display: 'flex', alignItems: 'center', gap: 2.6, ...sw(vis.eq(t)) });
+  bars.forEach((bar, j) => {
+    const a = 0.35 + 0.65 * hash(j * 17.3 + nb * 3.1);
+    const e = Math.exp(-since / 0.17), wob = 0.5 + 0.5 * Math.sin(t * 8.3 + j * 1.9);
+    const bh = 3 + on * (eh - 3) * clamp(a * e + 0.28 * wob * (1 - e));
+    K.css(bar, { display: 'block', width: 2.8, height: bh, borderRadius: 1.4, background: PAPER, opacity: 0.9 });
+  });
+  const vt = vis.title(t), va = vis.artist(t), vp = vis.prog(t), vc = vis.ctrl(t);
+  text(el.title, -100, -60, 17, 'l', vt, { fontWeight: 600, color: PAPER });
+  text(el.artist, -100, -38, 15, 'l', va, { fontWeight: 400, color: W56 });
+  const p = prog(t);
+  el.tL.textContent = fmt(p * SONG); el.tR.textContent = '-' + fmt(SONG - p * SONG);
+  text(el.tL, -164, 14, 12, 'l', vp, { fontWeight: 500, color: W56 });
+  text(el.tR, 164, 14, 12, 'r', vp, { fontWeight: 500, color: W56 });
+  const g = GRAB(t);
+  K.css(el.trackBg, { left: TRACK_L, top: 11 - 2 * g, width: TRACK_W, height: 6 + 4 * g, borderRadius: 5, background: 'rgba(255,255,255,.2)', ...sw(vp) });
+  const thumbR = 7.5 * clamp(g / 0.55) * vis.thumb(t);
+  K.css(el.thumb, { left: TRACK_L + TRACK_W * p - thumbR, top: 14 - thumbR, width: thumbR * 2, height: thumbR * 2, borderRadius: thumbR,
+    background: PAPER, boxShadow: '0 1px 3px rgba(0,0,0,.35)', display: thumbR > 0.05 ? 'block' : 'none' });
+  const media = { fill: PAPER, stroke: PAPER, strokeWidth: 1.6, strokeLinejoin: 'round' };
+  iconAt(el.prev, -60, 62, 22, vc, null, media);
+  iconAt(el.next, 60, 62, 22, vc, null, media);
+  iconAt(el.pp, 0, 62, 30, vc, null, media);
+  K.attr(el.ppPath, 'd', playPause(clamp(PLAYPAUSE(t)), 30));
+
+  // the blob
+  const L = BL(t), R = BR(t), T = BT(t), Bo = BB(t);
+  K.css(el.blob, { left: L, top: T, width: Math.max(0, R - L), height: Math.max(0, Bo - T), borderRadius: BRAD(t), background: BCOL(t),
+    boxShadow: `0 1px 4px rgba(0,0,0,${(0.28 * BSHADOW(t)).toFixed(3)})`, opacity: vis.blob(t) });
+
+  // volume slider icons (the right one inverts when the fill covers it)
+  const vv = vis.vol(t), s = stretch(t), hiX = 126 + s, cover = clamp((R - (hiX - 12)) / 24);
+  iconAt(el.volLo, -126, 0, 20, vv, INK);
+  iconAt(el.volHi, hiX, 0, 20, vv, mixHex('#6E6E70', INK, cover));
+
+  // tabs: gray labels, plus an ink copy clipped to the indicator — the inversion follows the
+  // liquid edges pixel for pixel instead of fading the whole word
+  const ty = TAB_Y(t), vtab = vis.tabs(t);
+  tabs.forEach((tab, k) => {
+    const xc = -126 + 84 * k, il = clamp(L - (xc - 150), 0, 300), ir = clamp(xc + 150 - R, 0, 300);
+    text(tab, xc, ty, 15, 'c', vtab, { fontWeight: 500, color: '#8E8E90' });
+    text(tabsInk[k], xc, ty, 15, 'c', vtab, { fontWeight: 500, color: INK, clipPath: `inset(0px ${ir.toFixed(2)}px 0px ${il.toFixed(2)}px)` });
+  });
+  K.css(el.tabsTrack, { left: -172, top: -134, width: 344, height: 52, borderRadius: 26, background: 'rgba(255,255,255,.08)', opacity: vis.tabsTrack(t) });
+
+  // chart: line draws itself, value counts up, tooltip follows the hover
+  const vch = vis.chart(t), d = clamp(DRAW(t));
+  el.value.textContent = Math.round(2481 * d).toLocaleString('en-US');
+  text(el.value, -172, -52, 30, 'l', vch, { fontWeight: 600, color: PAPER, letterSpacing: '-0.02em' });
+  text(el.valueSub, -172, -24, 13, 'l', vch, { fontWeight: 400, color: W56 });
+  text(el.delta, 172, -48, 13, 'r', vch, { fontWeight: 500, color: ACC || PAPER, opacity: vch * 0.8 });
+  K.css(el.plot, { left: -172, top: 0, width: 344, height: 104, ...sw(vch, { scale: 1 }) });
+  K.attr(el.line, 'stroke', ACC || PAPER);
+  K.attr(el.line, 'stroke-dasharray', `${LINE_LEN} ${LINE_LEN}`);
+  K.attr(el.line, 'stroke-dashoffset', LINE_LEN * (1 - d));
+  K.attr(el.area, 'fill', ACC || PAPER);
+  K.attr(el.area, 'fill-opacity', 0.1);
+  K.attr(el.revealRect, 'width', 344 * d);
+  const vtip = vis.tip(t), tx = TIP_X(t), tyy = curveY(tx);
+  K.attr(el.guide, 'x1', tx); K.attr(el.guide, 'x2', tx); K.attr(el.guide, 'opacity', vtip);
+  K.attr(el.dot, 'cx', tx); K.attr(el.dot, 'cy', tyy); K.attr(el.dot, 'fill', PAPER); K.attr(el.dot, 'stroke', INK);
+  K.attr(el.dot, 'r', 5.2 * vtip * (1 - 0.18 * (K.cursorAt(t)?.press || 0)));
+  K.css(el.days, { left: -178, top: 118, width: 356, height: 16, fontSize: 11,
+    lineHeight: '16px', fontWeight: 500, color: W40, ...sw(vis.days(t)) });
+  K.css(el.tip, { left: tx - 46, top: tyy - 44, width: 92, height: 28, borderRadius: 14, background: PAPER, display: 'grid',
+    placeItems: 'center', boxShadow: '0 4px 12px -4px rgba(0,0,0,.4)', ...sw(vtip, { scale: 0.9, dy: 6 }) });
+  for (const [e, v] of [[el.tipA, vis.tipA(t)], [el.tipB, vis.tipB(t)]]) {
+    K.css(e, { gridArea: '1 / 1', fontSize: 12, fontWeight: 600, color: INK, ...sw(v, { blur: 8 }) });
+  }
+
+  // ⌘K pill → palette
+  iconAt(el.sIcon, S_ICON_X(t), 0, 18, vis.sIcon(t), I45);
+  text(el.ph1, -104, 0, 16, 'l', vis.ph1(t), { color: I40 });
+  K.css(el.kbd, { left: 104, top: -13, width: 38, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1,
+    fontSize: 13, fontWeight: 600, color: I60, ...sw(vis.kbd(t)) });
+  const typed = typedAt(t);
+  // a placeholder disappears the instant the first key lands — no fade, or it overlaps the typed text
+  text(el.ph2, -146, 0, 17, 'l', typed ? 0 : vis.ph2(t), { color: I40 });
+  K.text(el.typed, typed);
+  // typed characters appear instantly (keys don't fade in); the text leaves with the palette
+  text(el.typed, -146, 0, 17, 'l', typed ? vis.typed(t) : 0, { fontWeight: 500, color: INK });
+  const tw = typed ? el.typed.offsetWidth : 0;
+  K.css(el.caret, { left: -146 + tw + 1.5, top: -11, width: 2, height: 22, borderRadius: 1, background: ACC || INK, opacity: vis.pal(t) });
+  K.css(el.divider, { left: -200, top: 26, width: 400, height: 1, background: 'rgba(11,11,12,.08)', opacity: vis.pal(t) });
+  rows.forEach((row, i) => {
+    const v = K.presence(t, 24, rowOut[i] ?? 26, { delay: 0.12 + i * 0.035 });
+    const yc = 54 + 40 * rowSlot[i](t);
+    K.css(row, { left: -192, top: yc - 20, width: 384, height: 40, display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px',
+      boxSizing: 'border-box', color: INK, ...sw(v, { scale: 0.97 }) });
+    const [ri, rl, rh] = row.children;
+    K.css(ri, { display: 'block', width: 18, height: 18, color: I60 });
+    K.css(rl, { fontSize: 15, fontWeight: 500, flex: '1' });
+    K.css(rh, { fontSize: 13, fontWeight: 500, color: I40 });
+  });
+
+  // toast
+  const vto = vis.toast(t);
+  iconAt(el.toastIcon, -120, 0, 22, vto, PAPER);
+  const tc = clamp(K.since(t, 26.5) / 0.3), tp = clamp(K.since(t, 27) / 0.28);
+  K.attr(el.tiC, 'stroke', PAPER); K.attr(el.tiC, 'stroke-dasharray', `${(58 * minjerk(tc)).toFixed(3)} 58`);
+  K.attr(el.tiP, 'stroke', PAPER); K.attr(el.tiP, 'stroke-dasharray', 13); K.attr(el.tiP, 'stroke-dashoffset', 13 * (1 - minjerk(tp)));
+  text(el.toastText, -98, 0, 15, 'l', vto, { fontWeight: 500, color: PAPER });
+  text(el.toastUndo, 126, 0, 15, 'r', vis.undo(t), { fontWeight: 500, color: W56 });
+});
+
+K.mount($('#stage'), { audio: CONFIG.audio });
+</script>
+</body>
+</html>

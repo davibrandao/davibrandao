@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Morph loop</title>
+<style>
+  @font-face { font-family: 'Geist'; src: url('Geist-Variable.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
+  :root {
+    --canvas: #ECEAE6;   /* light warm gray */
+    --ink: #0B0B0C;      /* components: black … */
+    --paper: #FFFFFF;    /* … and white */
+    --muted: #8C8984;
+  }
+  html, body { margin: 0; background: var(--canvas); }
+  #stage {
+    position: relative; width: 1440px; height: 1440px; overflow: hidden;
+    background: var(--canvas); color: var(--ink);
+    font-family: 'Geist', system-ui, sans-serif; font-feature-settings: 'ss01';
+    -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;
+  }
+  /* The camera scales #world. Never put will-change (or translateZ hacks) on #world or
+     anything inside it: the text gets rasterized once and then scaled, and turns blurry. */
+  #world { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+  /* The one shape. Every state is this element; only its size, radius and color change. */
+  /* minmax(0,1fr): the cell is exactly the shape, so every layer stays centred on it even
+     while the shape is smaller than the layer (it overflows evenly and gets clipped). */
+  #shape { position: absolute; overflow: hidden; display: grid; place-items: center;
+           grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
+  /* Content layers share one grid cell, each sized for its own state. */
+  .layer { grid-area: 1 / 1; display: flex; align-items: center; justify-content: center; white-space: nowrap; }
+  .label { font-size: 17px; font-weight: 500; letter-spacing: -0.01em; }
+  .num { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="world">
+    <div id="shape" data-shape>
+      <div class="layer" data-name="button"><span class="label" style="display:flex;align-items:center;gap:8px"><span id="btnIcon"></span>Download</span></div>
+      <div class="layer" data-name="loader"><svg width="24" height="24" viewBox="0 0 24 24"><circle id="arc" cx="12" cy="12" r="9" fill="none" stroke-width="2.4" stroke-linecap="round"/></svg></div>
+      <div class="layer" data-name="check"><svg width="26" height="26" viewBox="0 0 24 24"><path id="tick" d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+  </div>
+</div>
+
+<script src="morph-kit.js"></script>
+<script>
+/* CONFIG — written by new_project.py from the beat analysis. */
+const CONFIG = {"bpm": 120, "bars": 2, "beats": null, "accent": null, "audio": "mix.wav"};
+/* END CONFIG */
+
+const { spring, lerp, clamp, remap } = MorphKit;
+const K = MorphKit.create({ bpm: CONFIG.bpm, bars: CONFIG.bars, beats: CONFIG.beats });
+const INK = '#0B0B0C', PAPER = '#FFFFFF', ACCENT = CONFIG.accent || INK;
+
+// Springs: a tiny overshoot at most. Name them by feel, reuse them everywhere.
+const SP = {
+  morph: spring(0.55, 0.12),   // size/radius changes of the shape
+  snap: spring(0.3, 0.08),     // small, quick things (press, knobs)
+  color: spring(0.5, 0),       // colors never overshoot
+  cam: spring(0.95, 0),        // camera pushing in: slow, like an operator settling
+  camOut: spring(0.5, 0),      // camera pulling back: as fast as the shape grows
+};
+
+// ---- 1. States: size, radius, color of the one shape (world px, 1x UI scale)
+const S = {
+  button: { w: 196, h: 56, r: 28, bg: INK },
+  loader: { w: 56, h: 56, r: 28, bg: INK },
+  check:  { w: 56, h: 56, r: 28, bg: ACCENT },
+};
+
+// ---- 2. Timeline in beats. Every change lands on the grid (16ths at most).
+const plan = [
+  [0, 'button'],   // 1.1  (loop seam: arrives from the last state)
+  [2, 'loader'],   // 1.3  click → loader
+  [4, 'check'],    // 2.1  done
+];
+plan.forEach(([b, s]) => K.event(b, s));
+const key = (prop) => plan.map(([b, s]) => [b, S[s][prop]]);
+const W = K.track(key('w'), SP.morph), H = K.track(key('h'), SP.morph), R = K.track(key('r'), SP.morph);
+const BG = K.colorTrack(key('bg'), SP.color);
+
+// Press feedback on the shape (squish while the cursor is down).
+const presses = [[1.75, 2]];               // [down, up] in beats — UI reacts on release, on the beat
+const PRESS = K.track([[0, 0], [1.75, 1, SP.snap], [2, 0, SP.snap]], SP.snap, { from: 0 });
+
+// ---- 3. Camera: zoom so each state fills the frame (log-space spring).
+K.camera([
+  [0, K.fit(S.button.w, S.button.h, 0.5), 0, 0, SP.camOut],   // [beat, zoom, cx, cy, spring]
+  [2, K.fit(56, 56, 0.25)],
+  [4, K.fit(56, 56, 0.27)],
+], SP.cam);
+
+// ---- 4. Cursor: arrive early, press on the beat before, release on the beat.
+K.cursor([
+  [0, [150, 120]],
+  [1.5, [40, 10]],
+  [2.5, [40, 10]],
+  [3.5, [110, 90]],
+  [7, [150, 120]],
+], presses);
+
+// ---- 5. Sound cues (peak lands on the beat)
+K.cue(2, 'click'); K.cue(4, 'success');
+
+// ---- 6. Content layers (blur swaps with separate enter/exit timing)
+const $ = (s) => document.querySelector(s);
+const shape = $('#shape'), world = $('#world');
+const layers = {
+  button: K.layer($('[data-name=button]'), 'shape', (t) => K.presence(t, 0, 2)),
+  loader: K.layer($('[data-name=loader]'), 'shape', (t) => K.presence(t, 2, 4)),
+  check:  K.layer($('[data-name=check]'), 'shape', (t) => K.presence(t, 4, 8)),
+};
+$('#btnIcon').innerHTML = MorphKit.icon('arrowDown', 18, 2, PAPER);
+const arc = $('#arc'), tick = $('#tick');
+const ARC_LEN = 2 * Math.PI * 9, TICK_LEN = 22;
+
+K.onFrame((t) => {
+  K.css(world, { transform: K.worldTransform() });
+  const p = PRESS(t);
+  K.css(shape, {
+    ...K.box(0, 0, W(t), H(t), R(t)),
+    background: BG(t),
+    transform: `scale(${1 - 0.04 * p})`,
+  });
+  for (const name in layers) {
+    const el = $(`[data-name=${name}]`);
+    K.css(el, { ...K.swap(layers[name](t)), color: PAPER });
+  }
+  // loader: arc sweeps and spins, as pure functions of time since it appeared
+  const tl = K.since(t, 2);
+  K.attr(arc, 'stroke', PAPER);
+  K.attr(arc, 'stroke-dasharray', `${ARC_LEN * remap(tl, 0, K.b(2), 0.15, 0.95)} ${ARC_LEN}`);
+  K.attr(arc, 'transform', `rotate(${-90 + tl * 540} 12 12)`);
+  // check draws itself — K.since is loop-aware, so it stays drawn across the seam
+  const tc = clamp((K.since(t, 4) - 0.05) / 0.3);
+  K.attr(tick, 'stroke', PAPER);
+  K.attr(tick, 'stroke-dasharray', `${TICK_LEN}`);
+  K.attr(tick, 'stroke-dashoffset', `${TICK_LEN * (1 - MorphKit.minjerk(tc))}`);
+});
+
+K.mount($('#stage'), { audio: CONFIG.audio });
+</script>
+</body>
+</html>

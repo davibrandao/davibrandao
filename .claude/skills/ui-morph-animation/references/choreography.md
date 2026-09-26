@@ -1,7 +1,7 @@
 # Choreography: from a list of states to a beat sheet
 
 ## Contents
-1. The grid
+1. The grid (1b: default and alternative chains)
 2. Rules for the beat sheet
 3. The cursor
 4. The camera
@@ -27,6 +27,24 @@
 - Other tempos: scale the motion with the beat. A good morph duration is about 1.1 × beat
   (0.55 s at 120 BPM, 0.45 s at 140, 0.7 s at 90). At slow tempos, put interactions on
   eighths so there is still something every half second.
+
+## 1b. Default and alternative chains
+
+Offer these when the user hasn't named states. Each has been checked for continuity
+(a carried part links most neighbors) and for alternating scale. The first two have been
+built end to end.
+
+- **Default (12 states, 7 bars):** button → loader → check → dynamic island → music player →
+  volume slider → toggle → tabs → chart → ⌘K pill → command palette → toast. This is the
+  reference build.
+- **Trip planner (8 states, 6 bars):** search bar → dropdown → date picker (range drag) →
+  stepper (guests) → like → notification → avatar stack → toast. Carried parts: the
+  dropdown highlight → calendar hover dot → range pill; the bell badge → unread dot; the
+  card avatars → the stack.
+- **Sign-up (8 states, 5–6 bars):** button → dropdown (plan) → pricing switch (price rolls) →
+  stepper (seats) → text field (email) → OTP code → check → toast.
+- **Publish a shot (8 states, 5–6 bars):** button → upload (progress) → check → like →
+  notification → avatar stack → chart → toast.
 
 ## 2. Rules for the beat sheet
 

@@ -15,10 +15,15 @@ The craft lives in three places, and this skill covers each:
 - **Motion**: springs, blur swaps, liquid edges, camera. See `assets/morph-kit.js`.
 - **Pipeline**: beat analysis, sound placement, per-beat review, and the render. See `scripts/`.
 
-`examples/reference.html` is a finished 7-bar build of the canonical sequence (button →
-loader → check → island → player → scrub → volume stretch → toggle → liquid tabs → chart →
-⌘K → type → enter → toast → button). Read it before building. It shows every pattern
+`examples/reference.html` is a finished 7-bar build of the default 12 states (button →
+loader → check → dynamic island → music player → volume slider → toggle → tabs → chart →
+⌘K pill → command palette → toast → button). Along the way it plays, scrubs, stretches the
+volume past max, types, and presses enter. Read it before building. It shows every pattern
 below working together, and most new states are variations of something in it.
+
+Paths: `$SKILL` below means this skill's folder. Run everything from the user's working
+directory, so the song, `beats.json` and the project folder live there, never inside
+`$SKILL`.
 
 ## Direction
 
@@ -52,16 +57,21 @@ answer:
    tabs → chart → ⌘K pill → command palette → toast (→ button). Scrubbing, typing and
    hovering are interactions inside states, not extra states. If the user describes the
    idea loosely ("a button that turns into a bunch of components"), offer the default
-   and a few alternatives from `references/state-recipes.md`.
+   plus the pre-checked alternative chains in `references/choreography.md` §1b.
+   `references/state-recipes.md` lists every state they can mix in.
 2. **Pure black and white (the default), or one accent color** as a hex value.
 3. **A royalty-free song around 120 BPM**, as a local path or a URL, or by dropping the file
-   into the working folder. Mixkit tracks are free for commercial use in videos, but still
-   point the user to the track's license page. If a download is blocked, ask for the file.
-   With no song yet, the default is `scripts/placeholder_track.py` (a synthetic groove) for
-   timing. The real track swaps in later with a re-analysis.
+   into the working folder. Mixkit is a good source: its tracks are free for commercial use
+   in videos, and the user should read the license on the chosen track's page. Sandboxed
+   sessions often block music hosts. If `curl -sI <url>` fails, ask for the file instead.
+   With no song yet, the default is `$SKILL/scripts/placeholder_track.py` (a synthetic
+   groove) as a timing stand-in. Say so up front. Before the final render, ask once more
+   for the real track, and re-analyze and re-time when it arrives. If none comes, deliver
+   with the placeholder and label it as one.
 
 Also mention the output format once: a 1440×1440 square MP4 at 60 fps with sound, plus a
-self-contained HTML file. The loop runs about 1.2 s per state at 120 BPM.
+self-contained HTML file. The loop runs roughly 1.2–1.5 s per state at 120 BPM: about 14 s
+for 12 states, and 10–12 s for 8.
 
 If the user already gave all three, skip straight to step 2. Don't write animation code
 before step 3 is approved.
@@ -70,7 +80,7 @@ before step 3 is approved.
 
 ```bash
 pip install numpy pillow playwright   # plus ffmpeg on PATH (or: pip install imageio-ffmpeg)
-python3 scripts/analyze_beats.py song.mp3 --bars 7 --bpm-hint 120 --out beats.json
+python3 $SKILL/scripts/analyze_beats.py song.mp3 --bars 7 --bpm-hint 120 --out beats.json
 ```
 
 Choose `--bars` by counting interactions, not states. A morph takes about 1 beat, and so
@@ -99,7 +109,7 @@ cheapest moment to change the story.
 ### 4. Build
 
 ```bash
-python3 scripts/new_project.py morph-loop --beats beats.json --song song.mp3 [--accent '#FF4F1A'] [--from-example]
+python3 $SKILL/scripts/new_project.py morph-loop --beats beats.json --song song.mp3 [--accent '#FF4F1A'] [--from-example]
 ```
 
 This writes `index.html` (the beat grid is already in `CONFIG`), `morph-kit.js`, the
@@ -119,13 +129,13 @@ one `#shape`. Build in this order, because each layer depends on the one before:
 
 You can't watch a browser, so you see frames through `review.py` (step 5). Use `--at` for
 single moments and `--range A:B:STEP` for a filmstrip of a transition. For the user,
-`python3 scripts/serve.py morph-loop` serves a live preview (space plays with sound, ←/→
+`python3 $SKILL/scripts/serve.py morph-loop` serves a live preview (space plays with sound, ←/→
 steps a beat, shift+←/→ steps a frame).
 
 ### 5. Review one frame per beat before the full render
 
 ```bash
-python3 scripts/review.py morph-loop/index.html --mid     # + --at 12.5,19.25 close-ups, --range 18.75:19.75:0.125 filmstrip
+python3 $SKILL/scripts/review.py morph-loop/index.html --mid   # + --at 12.5,19.25 close-ups, --range 18.75:19.75:0.125 filmstrip
 ```
 
 Open `review/sheet.png` (one row per bar, beat and half-beat) with the Read tool, then
@@ -145,8 +155,8 @@ Automated checks catch mechanical problems. Taste is on you, so look at the fram
 ### 6. Render and deliver
 
 ```bash
-python3 scripts/render.py morph-loop/index.html --song song.mp3 --beats beats.json   # → loop.mp4
-python3 scripts/bundle.py morph-loop                                                  # → dist/loop.html
+python3 $SKILL/scripts/render.py morph-loop/index.html --song song.mp3 --beats beats.json   # → loop.mp4
+python3 $SKILL/scripts/bundle.py morph-loop                                                  # → dist/loop.html
 ```
 
 `render.py` takes 4 subframes per frame across a 180° shutter, blends them with ffmpeg

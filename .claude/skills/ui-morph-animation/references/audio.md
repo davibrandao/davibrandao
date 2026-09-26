@@ -7,8 +7,11 @@
   page. If the network blocks the host, ask the user to upload the file.
 - Mixkit tracks are free for commercial use in videos. Still point the user to the specific
   track's license page, and make no other legal claims.
-- No song yet? `python3 scripts/placeholder_track.py placeholder.wav --bpm 120` makes a
-  synthetic groove with a known grid. It's fine for timing work but never the deliverable.
+- No song yet? `python3 $SKILL/scripts/placeholder_track.py placeholder.wav --bpm 120` makes a
+  synthetic groove with a known grid. It's a timing stand-in. Tell the user, and ask for the
+  real track again before the final render. When it arrives, re-run the analysis, update
+  `CONFIG` (or re-scaffold), and re-review, because the tempo and loop start will change. If
+  no song ever arrives, deliver with the placeholder and label it as one.
 
 ## analyze_beats.py (numpy only)
 
@@ -91,5 +94,5 @@ the cue times (the worst was 1.4 ms).
   crossfade hides the difference.
 - `render.py --song --beats` does all of this (it generates the kit if missing) and writes
   `PROJECT/mix.wav` and `PROJECT/cues.json`. To remix without re-rendering, run
-  `python3 scripts/mix_audio.py --song S --beats beats.json --cues PROJECT/cues.json --out mix.wav`
+  `python3 $SKILL/scripts/mix_audio.py --song S --beats beats.json --cues PROJECT/cues.json --out mix.wav`
   then `render.py --audio mix.wav`, or mux it with ffmpeg.

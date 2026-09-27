@@ -205,11 +205,13 @@
     K.H = opts.height ?? opts.size ?? 1440;
     K.size = Math.min(K.W, K.H);
     // Safe area: insets [top, right, bottom, left] the UI must stay out of (a Reel's header,
-    // caption and action buttons: about [220, 140, 420, 60] at 1080×1920). The camera centres
-    // states in it, K.fit sizes to it, and the audit measures the shape's margin against it.
+    // caption and action buttons: about [220, 140, 420, 60] at 1080×1920). States stay centred
+    // in the frame (K.focus: the frame centre unless you pass `focus`), so the video looks
+    // right in any player; the safe area limits how big they get (K.fit) and the audit
+    // measures the shape's margin against it.
     const ins = opts.safe ?? [0, 0, 0, 0];
     K.safe = { l: ins[3], t: ins[0], r: K.W - ins[1], b: K.H - ins[2] };
-    K.focus = opts.focus ?? [(K.safe.l + K.safe.r) / 2, (K.safe.t + K.safe.b) / 2];
+    K.focus = opts.focus ?? [K.W / 2, K.H / 2];
     K.bpm = opts.bpm ?? 120;
     K.beatsPerBar = opts.beatsPerBar ?? 4;
     K.bars = opts.bars ?? 7;
@@ -376,10 +378,14 @@
       K._camera = (t) => ({ z: Math.exp(lz(t)), cx: cx(t), cy: cy(t) });
       return K._camera;
     };
-    // Zoom that makes a w×h box fill `fill` of the safe area (the whole frame by default).
-    K.fit = (w, h, fill = 0.7) => Math.min(((K.safe.r - K.safe.l) * fill) / w, ((K.safe.b - K.safe.t) * fill) / h);
+    // Zoom that makes a w×h box fill `fill` of the largest box centred on K.focus that stays
+    // inside the safe area (the whole frame when there's no safe area).
+    K.fit = (w, h, fill = 0.7) => {
+      const hw = Math.min(K.focus[0] - K.safe.l, K.safe.r - K.focus[0]), hh = Math.min(K.focus[1] - K.safe.t, K.safe.b - K.focus[1]);
+      return Math.min((2 * hw * fill) / w, (2 * hh * fill) / h);
+    };
     K.camAt = (t) => (K._camera ? K._camera(t) : { z: 1, cx: 0, cy: 0 });
-    // the camera centre (cx, cy) lands on K.focus: the frame centre, or the safe area's
+    // the camera centre (cx, cy) lands on K.focus (the frame centre by default)
     K.project = (t, p) => { const c = K.camAt(t); return [(p[0] - c.cx) * c.z + K.focus[0], (p[1] - c.cy) * c.z + K.focus[1]]; };
     K.unproject = (t, s) => { const c = K.camAt(t); return [(s[0] - K.focus[0]) / c.z + c.cx, (s[1] - K.focus[1]) / c.z + c.cy]; };
     K.worldTransform = () => `translate(${K.focus[0]}px, ${K.focus[1]}px) scale(${K.cam.z}) translate(${-K.cam.cx}px, ${-K.cam.cy}px)`;
@@ -703,8 +709,8 @@
         const k = stageR.width / K.W, s = K.safe;
         const m = Math.min(sr.left - stageR.left - s.l * k, stageR.left + s.r * k - sr.right,
           sr.top - stageR.top - s.t * k, stageR.top + s.b * k - sr.bottom) / k;
-        const safe = s.l || s.t || s.r < K.W || s.b < K.H;
-        if (m < (o.minMargin ?? 48)) out.push(`shape ${m < 0 ? `outside the ${safe ? 'safe area' : 'frame'}` : `crowds the ${safe ? 'safe area' : 'frame'} edge`} (margin ${m.toFixed(0)}px)`);
+        const safe = s.l || s.t || s.r < K.W || s.b < K.H;  // the safe area already has its own margin
+        if (m < (o.minMargin ?? (safe ? 12 : 48))) out.push(`shape ${m < 0 ? `outside the ${safe ? 'safe area' : 'frame'}` : `crowds the ${safe ? 'safe area' : 'frame'} edge`} (margin ${m.toFixed(0)}px)`);
       }
       return out;
     };

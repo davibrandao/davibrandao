@@ -11,11 +11,12 @@
   One shape, never cut. Brand palette: navy #033F76, sand gold #D4BA85, ocean #036E95 on warm sand.
   Carried parts: the suggestion's thumbnail opens into the photo card; the hover dot stretches into
   the date range; the WhatsApp button becomes the sent message; the typing bubble becomes the reply.
-  The camera centres every state in Instagram's safe area (K.safe), clear of the header, the
-  caption and the action buttons. Music: compose.py (original, loop-perfect), drop on beat 20.
+  Every state is centred in the frame and sized to stay inside Instagram's safe area (K.safe),
+  clear of the header, the caption and the action buttons. Music: compose.py (original,
+  loop-perfect), drop on beat 20.
   Read PLAN (the beat sheet), then GEO (the one shape), then the driven values, then frame(t).
   Third example of the skill: a vertical post with photos for a brand (Dunamis Travel, a
-  Brazilian travel agency; copy in Portuguese). For another place or brand, swap PHOTOS in
+  Brazilian travel agency; copy in Portuguese). For another place or brand, swap the photos in
   photos/, the palette, the copy and the dates, and keep the choreography. Rebuild:
     python3 $SKILL/scripts/new_project.py reel --from-example travel-reel
     python3 $SKILL/scripts/compose.py reel/music.wav --bars 8 --key F --drop 20
@@ -198,7 +199,7 @@ K.camera([
   [14, 2.45, 0, 0, SP.camOut],                  // checklist
   [20.5, 2.66, 0, 0, SP.drift],                 // sunset: a slow push-in while it plays
   [24, 2.4, 0, 0, SP.camOut],                   // chat
-  [28, 2.6, 0, 0, SP.cam],                      // sign-off
+  [28, 2.55, 0, 0, SP.cam],                     // sign-off
 ], SP.cam);
 const bleed = (k) => (t) => K.bleed(t, 90)[k];  // the full-bleed rect follows the camera
 const SUN = K.bleed(B(20), 100);                // the sunset photo covers the widest full-bleed rect
@@ -226,9 +227,9 @@ const CTA1_PRESS = pressOn(7.75, 8), CTA2_PRESS = pressOn(19.75, 20), WA_PRESS =
 
 // ---------------------------------------------------------------- cursor: real clicks, two swipes, one range drag
 const C = {
-  search: [-12, 6], park1: [160, 34], row: [36, 74], grab: [58, -70], swipeEnd: [-72, -70], cta1: [84, 163],
+  search: [-12, 6], park1: [156, 36], row: [36, 74], grab: [58, -70], swipeEnd: [-72, -70], cta1: [84, 163],
   d16: [COLX(1), WEEKY(RANGE_ROW)], d20: [COLX(5), WEEKY(RANGE_ROW)], park2: [128, 150], plus: [92, 2],
-  park3: [172, 150], cta2: [34, 102], park4: [150, 150], wa: [44, 198], park5: [170, 150],
+  park3: [158, 150], cta2: [34, 102], park4: [150, 150], wa: [44, 160], park5: [158, 150],
 };
 K.cursor([
   [0.5, C.search], [1, C.search], [1.75, C.park1], [2.5, C.park1], [3, C.row], [4, C.row],
@@ -454,13 +455,13 @@ K.onFrame((t) => {
 
   // ---- sunset copy
   const shade = '0 1px 14px rgba(2,24,48,.5)';
-  text(el.eyebrow, SUN.cx, -80, 12, 'c', vis.eyebrow(t), { fontWeight: 600, color: mixHex(GOLD, WHITE, 0.3), letterSpacing: '0.26em', paddingLeft: '0.26em', textShadow: shade });
-  text(el.bigTitle, SUN.cx, -44, 30, 'c', vis.title(t), { left: SUN.cx - 200, width: 400, fontWeight: 600, color: WHITE, letterSpacing: '-0.025em', textShadow: shade });
+  text(el.eyebrow, SUN.cx, -119, 12, 'c', vis.eyebrow(t), { fontWeight: 600, color: mixHex(GOLD, WHITE, 0.3), letterSpacing: '0.26em', paddingLeft: '0.26em', textShadow: shade });
+  text(el.bigTitle, SUN.cx, -83, 30, 'c', vis.title(t), { left: SUN.cx - 200, width: 400, fontWeight: 600, color: WHITE, letterSpacing: '-0.025em', textShadow: shade });
 
   // ---- the WhatsApp button → the sent message (one element)
   const vmsg = vis.msg(t), u = SP.morph.step(K.since(t, 24, 21));
   const waW = el.waLbl.offsetWidth + 22 + 8 + 44, msgW = el.msgTxt.offsetWidth + 16 + 6 + 30;
-  const bw = lerp(waW, msgW, u), mh = lerp(56, 40, u), my = lerp(196, -28, u);
+  const bw = lerp(waW, msgW, u), mh = lerp(56, 40, u), my = lerp(158, -28, u);
   const bx = lerp(SUN.cx + waW / 2, 134, u) - bw / 2;                 // centre; the bubble is right-aligned in the chat
   const rb = lerp(28, 20, u), sm = withScale(sw(vmsg, { scale: 0.7 }), 1 - 0.05 * WA_PRESS(t));
   K.css(el.msg, { left: bx - bw / 2, top: my - mh / 2, width: bw, height: mh, background: MSG_BG(t),

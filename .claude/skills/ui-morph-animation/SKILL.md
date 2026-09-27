@@ -143,10 +143,11 @@ of the examples. They all share one layout: content in world px under `#origin`,
 one `#shape`.
 
 With a composed track, scaffold with `--beats music.beats.json --song music.wav`, then
-retune the success chime to its key with `ui_sounds.py morph-loop/sounds --key F`. Photos go in `morph-loop/photos/` as `<img>` elements under `#origin`, placed with
-`K.photoAt` (cover-fit around a focus point). For a Reel, pass `safe: [220, 140, 420, 60]`
-to `MorphKit.create`, so the camera centres every state clear of Instagram's header, caption
-and buttons.
+retune the success chime to its key with `ui_sounds.py morph-loop/sounds --key F`. Photos go
+in `morph-loop/photos/` as `<img>` elements under `#origin`, placed with `K.photoAt`
+(cover-fit around a focus point). For a Reel, pass `safe: [220, 140, 420, 60]` to
+`MorphKit.create`. States stay centred in the frame, and the safe area keeps them clear of
+Instagram's header, caption and buttons.
 
 Build in this order, because each layer depends on the one before:
 

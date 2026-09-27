@@ -102,8 +102,11 @@ built end to end.
 - **Vertical formats.** In a 1080×1920 Reel, a 300-wide state at zoom 2.2–2.6 fills the
   width, and most states end up at similar zooms. Vary the state widths (280–320) and let
   small states (a stepper, a pill) zoom in to 3+ so the camera still breathes. Pass the safe
-  area to `create()` and every state centres clear of the platform's UI. A full-bleed photo
-  is the one state allowed past it (`K.bleed`), and it makes the natural drop.
+  area to `create()`: states stay centred in the frame (the video is also watched outside the
+  app, where an offset reads as a mistake), and the audit keeps them clear of the platform's
+  UI. A 1080 px Reel leaves about 800 px of width between the side insets, so keep states
+  under ~760 px on screen. A full-bleed photo is the one state allowed past it (`K.bleed`),
+  and it makes the natural drop.
 - Set one zoom per state so it fills the frame: 55–85 % of the width for wide states and
   25–40 % for tiny ones (loader, toggle). Use `K.fit(w, h, fill)` or set the values by eye.
   In the reference, zooms range from 3.05 (palette) to 6.2 (loader).

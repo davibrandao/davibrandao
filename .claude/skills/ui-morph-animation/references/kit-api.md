@@ -27,9 +27,11 @@ const K = MorphKit.create({ bpm: 120, bars: 7, beatsPerBar: 4, beats: null, loop
 - `width`/`height` (or `size` for a square) set the frame. `K.W`, `K.H`, and `K.size` (the
   shorter side) read it back.
 - `safe: [top, right, bottom, left]` insets mark where platform UI covers the frame (a Reel's
-  header, caption and action buttons). `K.safe` is `{ l, t, r, b }`. The camera centres
-  every state on `K.focus` (the safe area's centre unless you pass `focus: [x, y]`), `K.fit`
-  sizes to the safe area, and the audit measures the shape's margin against it.
+  header, caption and action buttons). `K.safe` is `{ l, t, r, b }`. States stay centred on
+  `K.focus` (the frame centre unless you pass `focus: [x, y]`), so the video looks centred in
+  any player. The safe area limits their size instead: `K.fit` sizes to the largest box
+  around the focus that stays inside it, and the audit measures the shape's margin against it
+  (12 px minimum, since the insets are already a margin).
 - `beats`: optional measured beat times (s, relative to the loop start, `bars*4+1` of
   them). `new_project.py` passes them only when the song's tempo drifts. Otherwise the grid
   is exact from `bpm`.
@@ -146,8 +148,8 @@ K.camera([[0, 3.7], [2, 6.2], [24, 3.05, 0, 108, SP.camOut]], SP.cam);  // [beat
 K.css(world, { transform: K.worldTransform() });                          // inside frame(t)
 ```
 - Zoom springs in log space, because equal ratios feel like equal steps.
-  `K.fit(w, h, fill)` returns the zoom that makes a w×h box fill `fill` of the safe area
-  (the frame, unless `safe` was set).
+  `K.fit(w, h, fill)` returns the zoom that makes a w×h box fill `fill` of the largest box
+  centred on `K.focus` inside the safe area (the frame, unless `safe` was set).
 - `K.cam` is the current camera `{z, cx, cy}` during a frame. `K.project(t, [x, y])` and
   `K.unproject(t, [sx, sy])` convert world ↔ screen. The camera centre lands on `K.focus`.
 - `K.bleed(t, m = 80)` returns the world rect `{ cx, cy, w, h }` that covers the whole frame

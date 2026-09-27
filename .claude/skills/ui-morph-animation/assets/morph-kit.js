@@ -199,7 +199,11 @@
 
   function create(opts = {}) {
     const K = {};
-    K.size = opts.size ?? 1440;
+    // Frame size in px. Square 1440 by default; e.g. { width: 1080, height: 1920 } for a Reel,
+    // 1080×1350 for a 4:5 feed post. K.size is the shorter side (handy for proportions).
+    K.W = opts.width ?? opts.size ?? 1440;
+    K.H = opts.height ?? opts.size ?? 1440;
+    K.size = Math.min(K.W, K.H);
     K.bpm = opts.bpm ?? 120;
     K.beatsPerBar = opts.beatsPerBar ?? 4;
     K.bars = opts.bars ?? 7;
@@ -367,11 +371,11 @@
       return K._camera;
     };
     // Zoom that makes a w×h box fill `fill` of the frame.
-    K.fit = (w, h, fill = 0.7) => Math.min((K.size * fill) / w, (K.size * fill) / h);
+    K.fit = (w, h, fill = 0.7) => Math.min((K.W * fill) / w, (K.H * fill) / h);
     K.camAt = (t) => (K._camera ? K._camera(t) : { z: 1, cx: 0, cy: 0 });
-    K.project = (t, p) => { const c = K.camAt(t); return [(p[0] - c.cx) * c.z + K.size / 2, (p[1] - c.cy) * c.z + K.size / 2]; };
-    K.unproject = (t, s) => { const c = K.camAt(t); return [(s[0] - K.size / 2) / c.z + c.cx, (s[1] - K.size / 2) / c.z + c.cy]; };
-    K.worldTransform = () => `translate(${K.size / 2}px, ${K.size / 2}px) scale(${K.cam.z}) translate(${-K.cam.cx}px, ${-K.cam.cy}px)`;
+    K.project = (t, p) => { const c = K.camAt(t); return [(p[0] - c.cx) * c.z + K.W / 2, (p[1] - c.cy) * c.z + K.H / 2]; };
+    K.unproject = (t, s) => { const c = K.camAt(t); return [(s[0] - K.W / 2) / c.z + c.cx, (s[1] - K.H / 2) / c.z + c.cy]; };
+    K.worldTransform = () => `translate(${K.W / 2}px, ${K.H / 2}px) scale(${K.cam.z}) translate(${-K.cam.cx}px, ${-K.cam.cy}px)`;
 
     // ---- cursor: stops at anchors on beats, moves with minimum-jerk + a slight arc.
     // keys: [[beat, anchor, {arc}], ...]; anchor = [x, y] in world space or (t) => [x, y].
@@ -468,6 +472,15 @@
       else { box.left = x - 150; box.width = 300; box.textAlign = 'center'; }
       K.css(el, { position: 'absolute', ...box, ...K.swap(v, swo), ...extra });
     };
+    // A photo (<img>) filling a world-px box like CSS object-fit: cover, with a slow zoom.
+    // zoom > 1 pushes in around the focus point (fx, fy in 0..1 of the image). Drive zoom from
+    // time (e.g. 1 + 0.06 * K.since(t, appearBeat) / 2) for a Ken Burns drift. `extra` last.
+    K.photoAt = (el, left, top, w, h, o = {}, extra = {}) => {
+      const fx = o.fx ?? 0.5, fy = o.fy ?? 0.5, z = o.zoom ?? 1;
+      K.css(el, { position: 'absolute', left, top, width: w, height: h, objectFit: 'cover',
+        objectPosition: `${(fx * 100).toFixed(2)}% ${(fy * 100).toFixed(2)}%`, borderRadius: o.r ?? 0,
+        transform: `scale(${z.toFixed(5)})`, transformOrigin: `${(fx * 100).toFixed(2)}% ${(fy * 100).toFixed(2)}%`, ...extra });
+    };
     // A size×size box centred at world (x, y) — icons, glyph SVGs. `color` feeds currentColor.
     K.iconAt = (el, x, y, size, v, color, extra = {}) =>
       K.css(el, { position: 'absolute', left: x - size / 2, top: y - size / 2, width: size, height: size, color, ...K.swap(v), ...extra });
@@ -545,6 +558,7 @@
     // ---- mount: builds stage/world/cursor, dev player, and exposes window.seek
     K.mount = (stage, o = {}) => {
       K.stage = stage;
+      stage.style.width = `${K.W}px`; stage.style.height = `${K.H}px`;
       const q = new URLSearchParams(location.search);
       const render = !!global.__RENDER__ || q.has('render');
       const hud = !!global.__HUD__ || q.has('hud');
@@ -560,7 +574,9 @@
       global.seek = K.seek;
       global.K = K;
       const fonts = (o.fonts || ['400 16px Geist', '500 16px Geist', '600 16px Geist']).map((f) => document.fonts.load(f));
-      K.ready = Promise.all(fonts).then(() => document.fonts.ready).then(() => { K.seek(0); return true; });
+      // photos must be decoded before any frame is captured, or early frames render empty
+      const imgs = [...stage.querySelectorAll('img')].map((img) => (img.complete && img.naturalWidth ? img.decode() : new Promise((res) => { img.onload = () => res(img.decode()); img.onerror = res; })).catch(() => {}));
+      K.ready = Promise.all([...fonts, ...imgs]).then(() => document.fonts.ready).then(() => { K.seek(0); return true; });
       if (!render) K.ready.then(() => devPlayer(stage, o));
       return K;
     };
@@ -568,8 +584,8 @@
     // ---- dev player (only when you open the file in a browser; the renderer never sees it)
     function devPlayer(stage, o) {
       const fit = () => {
-        const s = Math.min(innerWidth / K.size, (innerHeight - 56) / K.size);
-        const x = (innerWidth - K.size * s) / 2, y = (innerHeight - 56 - K.size * s) / 2;
+        const s = Math.min(innerWidth / K.W, (innerHeight - 56) / K.H);
+        const x = (innerWidth - K.W * s) / 2, y = (innerHeight - 56 - K.H * s) / 2;
         stage.style.transform = `translate(${x}px, ${y}px) scale(${s})`; stage.style.transformOrigin = '0 0';
         document.body.style.height = '100vh'; document.body.style.overflow = 'hidden';
       };

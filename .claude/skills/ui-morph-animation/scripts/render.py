@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from common import SIZE, dump_json, ffmpeg_bin, launch_chromium, open_page, page_info, serve  # noqa: E402
+from common import dump_json, ffmpeg_bin, launch_chromium, open_page, page_info, serve  # noqa: E402
 
 
 def subframe_times(m, fps, S, shutter):
@@ -37,13 +37,13 @@ def subframe_times(m, fps, S, shutter):
 def render_chunk(job):
     from playwright.sync_api import sync_playwright
 
-    url, f0, f1, fps, S, shutter, out, scale, wid = job
+    url, f0, f1, fps, S, shutter, out, scale, wid, W, H = job
     ff = ffmpeg_bin()
     vf = f"tmix=frames={S},select='eq(mod(n\\,{S})\\,{S - 1})',setpts=N/({fps}*TB)" if S > 1 else "null"
     cmd = [ff, "-y", "-v", "error", "-f", "image2pipe", "-c:v", "png", "-framerate", str(fps * S), "-i", "-",
            "-vf", vf, "-r", str(fps), "-c:v", "libx264rgb", "-qp", "0", "-preset", "ultrafast", out]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-    clip = {"x": 0, "y": 0, "width": SIZE, "height": SIZE, "scale": scale}
+    clip = {"x": 0, "y": 0, "width": W, "height": H, "scale": scale}
     t_start = time.time()
     with sync_playwright() as p:
         browser = launch_chromium(p)
@@ -107,7 +107,8 @@ def main():
     N = int(round(T * a.fps))
     cues_path = proj / "cues.json"
     dump_json(cues_path, {"T": T, "fps": a.fps, "frames": N, "cues": info["cues"]})
-    print(f"loop {T:.3f}s @ {info['bpm']:.2f} BPM → {N} frames × {a.subframes} subframes, {a.workers} workers")
+    print(f"loop {T:.3f}s @ {info['bpm']:.2f} BPM, {info['W']}×{info['H']} → {N} frames × {a.subframes} subframes, "
+          f"{a.workers} workers")
 
     # soundtrack
     audio = Path(a.audio).resolve() if a.audio else None
@@ -128,8 +129,8 @@ def main():
     W = max(1, min(a.workers, N // 8 or 1))
     bounds = [round(i * N / W) for i in range(W + 1)]
     tmp = Path(tempfile.mkdtemp(prefix="mk_render_", dir=str(proj)))
-    jobs = [(url, bounds[i], bounds[i + 1], a.fps, a.subframes, a.shutter, str(tmp / f"chunk{i:02d}.mkv"), a.scale, i)
-            for i in range(W)]
+    jobs = [(url, bounds[i], bounds[i + 1], a.fps, a.subframes, a.shutter, str(tmp / f"chunk{i:02d}.mkv"), a.scale, i,
+             info["W"], info["H"]) for i in range(W)]
     ctx = mp.get_context("spawn")
     with ctx.Pool(W) as pool:
         errs = pool.map(render_chunk, jobs)
@@ -154,7 +155,7 @@ def main():
     if a.gif:
         gif = out.with_suffix(".gif")
         subprocess.run([ff, "-y", "-v", "error", "-i", str(out), "-vf",
-                        "fps=30,scale=720:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];"
+                        "fps=30,scale='min(720,iw)':-2:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];"
                         "[b][p]paletteuse=dither=bayer:bayer_scale=3:diff_mode=rectangle", str(gif)], check=True)
         print(f"wrote {gif}")
     for f in tmp.iterdir():

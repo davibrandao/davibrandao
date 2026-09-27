@@ -53,7 +53,7 @@ const CONFIG = {"bpm": 120, "bars": 2, "beats": null, "accent": null, "audio": "
 /* END CONFIG */
 
 const { spring, clamp, minjerk, icon } = MorphKit;
-const K = MorphKit.create({ bpm: CONFIG.bpm, bars: CONFIG.bars, beats: CONFIG.beats });
+const K = MorphKit.create({ bpm: CONFIG.bpm, bars: CONFIG.bars, beats: CONFIG.beats, width: CONFIG.width, height: CONFIG.height });
 const B = K.b; // beats → seconds
 const INK = '#0B0B0C', PAPER = '#FFFFFF', ACC = CONFIG.accent;
 

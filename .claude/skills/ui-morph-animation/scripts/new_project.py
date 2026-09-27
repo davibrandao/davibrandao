@@ -5,7 +5,7 @@ Creates DIR/index.html (from the template, with the beat grid written into CONFI
 DIR/morph-kit.js, DIR/Geist-Variable.woff2, DIR/sounds/ (UI kit) and, when a song and
 beats.json are given, DIR/mix.wav (music only) so the dev player has sound right away.
 
-usage: new_project.py DIR [--beats beats.json] [--song SONG] [--bars 7] [--bpm 120]
+usage: new_project.py DIR [--beats beats.json] [--song SONG] [--bars 7] [--bpm 120] [--size 1080x1920]
                           [--accent '#FF4F1A'] [--from-example [reference|trip-planner]] [--force]
 --from-example starts from a finished build in examples/ instead of the minimal template —
 faster when most requested states are in it. reference: button → … → toast (7 bars, B&W);
@@ -32,6 +32,7 @@ def main():
     ap.add_argument("--bars", type=int, default=None)
     ap.add_argument("--bpm", type=float, default=None)
     ap.add_argument("--accent", default=None, help="one accent color, e.g. '#FF4F1A' (omit for pure black and white)")
+    ap.add_argument("--size", default=None, help="frame WxH: 1440x1440 (default), 1080x1920 Reel/Story, 1080x1350 feed 4:5")
     ap.add_argument("--from-example", nargs="?", const="reference", default=None, metavar="NAME")
     ap.add_argument("--force", action="store_true")
     a = ap.parse_args()
@@ -41,7 +42,7 @@ def main():
         sys.exit(f"{d}/index.html exists (use --force to overwrite)")
     d.mkdir(parents=True, exist_ok=True)
 
-    cfg = {"bpm": 120, "bars": 7, "beats": None, "accent": a.accent, "audio": "mix.wav"}
+    cfg = {"bpm": 120, "bars": 7, "beats": None, "accent": a.accent, "audio": "mix.wav", "width": 1440, "height": 1440}
     beats = None
     if a.beats:
         beats = json.loads(Path(a.beats).read_text())
@@ -50,6 +51,11 @@ def main():
         cfg["bpm"] = beats["bpm"]
         if not beats.get("steady_tempo", True):
             cfg["beats"] = sec["beats_rel"]  # follow the measured beats when the tempo drifts
+    if a.size:
+        w, h = (int(v) for v in a.size.lower().split("x"))
+        if w % 2 or h % 2:
+            sys.exit("--size needs even numbers (H.264 requires it)")
+        cfg["width"], cfg["height"] = w, h
     if a.bars:
         cfg["bars"] = a.bars
     if a.bpm:
@@ -95,7 +101,7 @@ def main():
         mix_audio.mix(a.song, beats["section"], [], d / "mix.wav", n_samples=int(round(T * mix_audio.SR)),
                       sounds_dir=str(d / "sounds"))
     print(f"project ready: {d}")
-    print(f"  {cfg['bars']} bars @ {cfg['bpm']} BPM"
+    print(f"  {cfg['width']}×{cfg['height']}, {cfg['bars']} bars @ {cfg['bpm']} BPM"
           f"{' (measured beat grid)' if cfg['beats'] else ''}, accent {cfg['accent'] or 'none (black and white)'}")
     print(f"  edit {d / 'index.html'}; preview: python3 {HERE / 'serve.py'} {d}")
 

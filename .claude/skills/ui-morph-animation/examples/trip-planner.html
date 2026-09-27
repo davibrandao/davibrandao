@@ -98,7 +98,7 @@ const CONFIG = {"bpm": 124.0, "bars": 6, "beats": null, "accent": "#3B5BFF", "au
 /* END CONFIG */
 
 const { spring, lerp, clamp, minjerk, mixHex, icon, ICONS } = MorphKit;
-const K = MorphKit.create({ bpm: CONFIG.bpm, bars: CONFIG.bars, beats: CONFIG.beats });
+const K = MorphKit.create({ bpm: CONFIG.bpm, bars: CONFIG.bars, beats: CONFIG.beats, width: CONFIG.width, height: CONFIG.height });
 const B = K.b; // beats → seconds
 
 // ---------------------------------------------------------------- palette

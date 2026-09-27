@@ -31,6 +31,16 @@ def main():
     html = html.replace('<script src="morph-kit.js"></script>', "<script>\n" + kit + "\n</script>")
     font = base64.b64encode((d / "Geist-Variable.woff2").read_bytes()).decode()
     html = html.replace("url('Geist-Variable.woff2')", f"url(data:font/woff2;base64,{font})")
+    # photos referenced by relative path become data URIs, so the file stays self-contained
+    mimes = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".avif": "image/avif"}
+
+    def inline(m):
+        p = d / m.group(2)
+        if not p.exists() or p.suffix.lower() not in mimes:
+            return m.group(0)
+        return f'{m.group(1)}data:{mimes[p.suffix.lower()]};base64,{base64.b64encode(p.read_bytes()).decode()}{m.group(3)}'
+
+    html = re.sub(r'(src=")(?!data:|https?:)([^"]+)(")', inline, html)
     mix = d / "mix.wav"
     if mix.exists() and not a.no_audio:
         with tempfile.TemporaryDirectory() as tmp:

@@ -29,7 +29,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
-from common import SIZE, dump_json, launch_chromium, open_page, page_info, serve  # noqa: E402
+from common import dump_json, launch_chromium, open_page, page_info, serve  # noqa: E402
 
 TICKS = "▁▂▃▄▅▆▇█"
 
@@ -68,8 +68,10 @@ def main():
     url = f"{base}/{html.name}"
     report = []
 
+    dims = {"W": 1440, "H": 1440}
+
     def grab(cdp, scale=1.0):
-        clip = {"x": 0, "y": 0, "width": SIZE, "height": SIZE, "scale": scale}
+        clip = {"x": 0, "y": 0, "width": dims["W"], "height": dims["H"], "scale": scale}
         data = cdp.send("Page.captureScreenshot", {"format": "png", "clip": clip})["data"]
         return base64.b64decode(data)
 
@@ -83,7 +85,9 @@ def main():
         page = open_page(browser, url, render=True, hud=True)
         cdp = page.context.new_cdp_session(page)
         info = page_info(page)
+        dims.update(W=info["W"], H=info["H"])
         T, nB, bpb = info["T"], info["nBeats"], info["beatsPerBar"]
+        tw, th = a.tile, int(round(a.tile * info["H"] / info["W"]))  # tiles keep the frame's aspect
         dump_json(proj / "cues.json", {"T": T, "fps": a.fps, "frames": int(round(T * a.fps)), "cues": info["cues"]})
         steps = [0.0, 0.5] if a.mid else [0.0]
         tiles, audits = [], {}
@@ -97,7 +101,7 @@ def main():
                 png = grab(cdp)
                 name = f"beat_{n:02d}{'_mid' if s else ''}.png"
                 (out / name).write_bytes(png)
-                tiles.append(Image.open(io.BytesIO(png)).convert("RGB").resize((a.tile, a.tile), Image.LANCZOS))
+                tiles.append(Image.open(io.BytesIO(png)).convert("RGB").resize((tw, th), Image.LANCZOS))
         for b in [float(x) for x in a.at.split(",") if x.strip()]:
             page.evaluate("b => K.seek(K.b(b))", b)
             (out / f"at_{b:g}.png").write_bytes(grab(cdp))
@@ -108,23 +112,23 @@ def main():
             for i in range(n):
                 b = r0 + i * st
                 page.evaluate("b => K.seek(K.b(b))", b)
-                strip.append(Image.open(io.BytesIO(grab(cdp))).convert("RGB").resize((a.tile, a.tile), Image.LANCZOS))
+                strip.append(Image.open(io.BytesIO(grab(cdp))).convert("RGB").resize((tw, th), Image.LANCZOS))
             cols = min(n, 8)
             rows_ = (n + cols - 1) // cols
-            sh = Image.new("RGB", (cols * a.tile + (cols + 1) * 8, rows_ * a.tile + (rows_ + 1) * 8), (255, 255, 255))
+            sh = Image.new("RGB", (cols * tw + (cols + 1) * 8, rows_ * th + (rows_ + 1) * 8), (255, 255, 255))
             for i, im in enumerate(strip):
                 rr, cc = divmod(i, cols)
-                sh.paste(im, (8 + cc * (a.tile + 8), 8 + rr * (a.tile + 8)))
+                sh.paste(im, (8 + cc * (tw + 8), 8 + rr * (th + 8)))
             sh.save(out / f"strip_{r0:g}-{r1:g}.png")
         cols = bpb * len(steps)
         rows = (len(tiles) + cols - 1) // cols
         gap = 8
-        sheet = Image.new("RGB", (cols * a.tile + (cols + 1) * gap, rows * a.tile + (rows + 1) * gap), (255, 255, 255))
+        sheet = Image.new("RGB", (cols * tw + (cols + 1) * gap, rows * th + (rows + 1) * gap), (255, 255, 255))
         for i, im in enumerate(tiles):
             r, c = divmod(i, cols)
-            sheet.paste(im, (gap + c * (a.tile + gap), gap + r * (a.tile + gap)))
+            sheet.paste(im, (gap + c * (tw + gap), gap + r * (th + gap)))
         sheet.save(out / "sheet.png")
-        report.append(f"# Review — {T:.3f}s loop, {info['bpm']:.2f} BPM, {info['bars']} bars\n")
+        report.append(f"# Review — {T:.3f}s loop, {info['bpm']:.2f} BPM, {info['bars']} bars, {info['W']}×{info['H']}\n")
         report.append(f"frames: {out}/beat_XX.png · contact sheet: {out}/sheet.png (one row per bar)\n")
         page.context.close()
 

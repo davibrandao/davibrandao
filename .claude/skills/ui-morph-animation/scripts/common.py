@@ -162,6 +162,11 @@ def open_page(browser, url, render=True, hud=False, scale=1.0):
     except Exception:
         msg = "\n".join(errors) or "window.K.ready never appeared (did the page call K.mount?)"
         sys.exit(f"Page failed to start:\n{msg}")
+    # the frame size lives in the page (K.W × K.H); match the viewport to it
+    w, h = page.evaluate("() => [K.W || 1440, K.H || 1440]")
+    if (w, h) != (SIZE, SIZE):
+        page.set_viewport_size({"width": int(w), "height": int(h)})
+        page.evaluate("() => K.seek(K.t)")
     if errors:
         print("page errors:\n  " + "\n  ".join(errors), file=sys.stderr)
     page._mk_errors = errors  # surfaced by callers after rendering
@@ -170,7 +175,7 @@ def open_page(browser, url, render=True, hud=False, scale=1.0):
 
 def page_info(page):
     return page.evaluate(
-        """() => ({T: K.T, bpm: K.bpm, bars: K.bars, nBeats: K.nBeats, beatsPerBar: K.beatsPerBar,
+        """() => ({T: K.T, bpm: K.bpm, bars: K.bars, nBeats: K.nBeats, beatsPerBar: K.beatsPerBar, W: K.W, H: K.H,
                    beats: Array.from({length: K.nBeats + 1}, (_, i) => K.b(i)),
                    events: K.events, cues: K.cues})"""
     )

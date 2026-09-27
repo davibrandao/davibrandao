@@ -112,7 +112,7 @@ const CONFIG = {"bpm": 120, "bars": 7, "beats": null, "accent": null, "audio": "
 /* END CONFIG */
 
 const { spring, lerp, clamp, remap, minjerk, hash, mixHex, icon, playPause, smoothPath } = MorphKit;
-const K = MorphKit.create({ bpm: CONFIG.bpm, bars: CONFIG.bars, beats: CONFIG.beats });
+const K = MorphKit.create({ bpm: CONFIG.bpm, bars: CONFIG.bars, beats: CONFIG.beats, width: CONFIG.width, height: CONFIG.height });
 const B = K.b; // beats → seconds
 
 // ---------------------------------------------------------------- palette

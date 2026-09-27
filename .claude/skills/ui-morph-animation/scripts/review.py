@@ -175,12 +175,25 @@ def main():
             report.append("## seam\n" + ("ok — " if seam_ok else "**FAIL** — the loop stutters. ") + line + "\n")
 
             # ------------------------------------------------------------ activity per beat (cursor hidden)
+            # measured inside the shape's footprint over the beat (not the whole frame), so a small
+            # change on a small state in a tall frame still counts; a still beat is 0 either way
             page.evaluate("() => { window.__NO_CURSOR__ = true; }")
-            k = 6
+            k, sc = 6, 0.125
             act = []
+            box_js = """t => { K.seek(t); const s = document.querySelector('[data-shape]');
+                if (!s) return null; const r = s.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; }"""
             for n in range(nB):
                 bt = page.evaluate("n => [K.b(n), K.b(n + 1)]", n)
-                fr = [frame(bt[0] + (bt[1] - bt[0]) * i / k, 0.125) for i in range(k + 1)]
+                ts_ = [bt[0] + (bt[1] - bt[0]) * i / k for i in range(k + 1)]
+                boxes = [b_ for b_ in (page.evaluate(box_js, tt) for tt in ts_) if b_]
+                fr = [frame(tt, sc) for tt in ts_]
+                if boxes:
+                    x0 = max(0, int((min(b_[0] for b_ in boxes) - 24) * sc))
+                    y0 = max(0, int((min(b_[1] for b_ in boxes) - 24) * sc))
+                    x1 = min(fr[0].shape[1], int(np.ceil((max(b_[2] for b_ in boxes) + 24) * sc)))
+                    y1 = min(fr[0].shape[0], int(np.ceil((max(b_[3] for b_ in boxes) + 24) * sc)))
+                    if x1 - x0 >= 4 and y1 - y0 >= 4:
+                        fr = [f_[y0:y1, x0:x1] for f_ in fr]
                 act.append(max(float(np.abs(fr[i + 1] - fr[i]).mean()) for i in range(k)))
             page.evaluate("() => { window.__NO_CURSOR__ = false; }")
             med = float(np.median(act)) or 1e-6

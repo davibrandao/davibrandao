@@ -5,7 +5,9 @@ Sounds: click tap tick key1-4 enter pop pop_down whoosh toggle success thud swip
 Each is written as a 48 kHz mono WAV; mix_audio.py lines up each sound's *measured
 peak* with its cue time, so a whoosh peaks on the beat instead of starting on it.
 
-usage: ui_sounds.py OUT_DIR
+usage: ui_sounds.py OUT_DIR [--key F]
+--key tunes the one pitched sound (success: root, then the fifth above) to the song's key,
+so it rings with the music instead of against it. Default: E (E6 → B6).
 """
 import argparse
 import json
@@ -130,10 +132,10 @@ def toggle():
     return finish(x)
 
 
-def success():
+def success(root=1318.5):
     t = t_axis(0.6)
     x = np.zeros_like(t)
-    for delay, f in ((0.0, 1318.5), (0.075, 1975.5)):
+    for delay, f in ((0.0, root), (0.075, root * 2 ** (7 / 12))):
         d = int(delay * SR)
         tt = t[: len(t) - d]
         tone = np.sin(2 * np.pi * f * tt) + 0.12 * np.sin(2 * np.pi * 2 * f * tt)
@@ -170,7 +172,15 @@ def peak_time(x, sr=SR, win=0.002):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("out_dir")
+    ap.add_argument("--key", default=None, help="song key (e.g. F, Dm, Bb) for the success chime")
     a = ap.parse_args()
+    if a.key:
+        pc = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}[a.key[0].upper()]
+        pc = (pc + {"#": 1, "b": -1}.get(a.key[1:2], 0)) % 12
+        root = 440 * 2 ** ((pc - 9) / 12)
+        while root < 960:  # the octave that sits between 960 and 1920 Hz
+            root *= 2
+        KIT["success"] = lambda: success(root)
     out = Path(a.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     meta = {}

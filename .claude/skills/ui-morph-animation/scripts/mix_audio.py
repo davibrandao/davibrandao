@@ -3,11 +3,13 @@
 
 - The song is cut on the analyzed downbeat. Its last `xfade` beat is crossfaded with the
   audio just *before* the start, so the end flows into the first frame and the loop is seamless.
+  The crossfade keeps power for unrelated audio and gain for audio that repeats. A composed
+  loop (compose.py) sets section.xfade_beats = 0, since it already continues into itself.
 - Every cue's sound is shifted so its loudest moment (not its first sample) lands on the cue
   time. Sounds that start before 0 or ring past the end wrap around the loop.
 
 usage: mix_audio.py --song SONG --beats beats.json --cues cues.json --out mix.wav
-                    [--sounds DIR] [--ui-db -8] [--music-db -1.5] [--xfade-beats 0.5] [--loops 1]
+                    [--sounds DIR] [--ui-db -8] [--music-db -1.5] [--xfade-beats B] [--loops 1]
 """
 import argparse
 import json
@@ -47,7 +49,9 @@ def load_sound(sounds_dir, name, cache={}):  # noqa: B006 — tiny per-process c
 
 
 def mix(song, section, cues, out, n_samples=None, sounds_dir=None, ui_db=-8.0, music_db=-1.5,
-        xfade_beats=0.5, loops=1, music=True):
+        xfade_beats=None, loops=1, music=True):
+    if xfade_beats is None:
+        xfade_beats = float(section.get("xfade_beats", 0.5))
     start = float(section["start"])
     T = float(section["duration"])
     beat = T / (len(section["beats_rel"]) - 1)
@@ -65,7 +69,10 @@ def mix(song, section, cues, out, n_samples=None, sounds_dir=None, ui_db=-8.0, m
         pre, body = seg[:X].astype(float), seg[X:X + N].astype(float).copy()
         if X > 0:
             u = np.linspace(0, 1, X)[:, None]
-            body[N - X:] = body[N - X:] * np.cos(u * np.pi / 2) + pre * np.sin(u * np.pi / 2)
+            a, b, tail = np.cos(u * np.pi / 2), np.sin(u * np.pi / 2), body[N - X:]
+            # equal power for unrelated audio, equal gain when both sides are the same music
+            rho = float(np.sum(tail * pre) / (np.sqrt(np.sum(tail ** 2) * np.sum(pre ** 2)) + 1e-12))
+            body[N - X:] = (tail * a + pre * b) / np.sqrt(np.maximum(1 + 2 * rho * a * b, 0.25))
         pk = np.max(np.abs(body)) + 1e-12
         body *= 10 ** (music_db / 20) / pk
     ui = np.zeros(N)
@@ -97,7 +104,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--ui-db", type=float, default=-8.0)
     ap.add_argument("--music-db", type=float, default=-1.5)
-    ap.add_argument("--xfade-beats", type=float, default=0.5)
+    ap.add_argument("--xfade-beats", type=float, default=None, help="default: section.xfade_beats, else 0.5")
     ap.add_argument("--loops", type=int, default=1)
     ap.add_argument("--no-music", action="store_true")
     a = ap.parse_args()

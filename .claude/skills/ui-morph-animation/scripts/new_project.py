@@ -6,11 +6,13 @@ DIR/morph-kit.js, DIR/Geist-Variable.woff2, DIR/sounds/ (UI kit) and, when a son
 beats.json are given, DIR/mix.wav (music only) so the dev player has sound right away.
 
 usage: new_project.py DIR [--beats beats.json] [--song SONG] [--bars 7] [--bpm 120] [--size 1080x1920]
-                          [--accent '#FF4F1A'] [--from-example [reference|trip-planner]] [--force]
+                          [--accent '#FF4F1A'] [--from-example [reference|trip-planner|travel-reel]] [--force]
 --from-example starts from a finished build in examples/ instead of the minimal template —
 faster when most requested states are in it. reference: button → … → toast (7 bars, B&W);
 trip-planner: search → dropdown → date range → stepper → like → notification → avatars →
-toast (6 bars, one accent).
+toast (6 bars, one accent); travel-reel: a 1080×1920 Reel with photos (search → suggestion →
+photo card → date range → travellers → checklist → full-bleed photo → chat → sign-off,
+8 bars). A folder example brings its photos along.
 """
 import argparse
 import json
@@ -62,13 +64,25 @@ def main():
         cfg["bpm"] = a.bpm
 
     src = SKILL / (f"examples/{a.from_example}.html" if a.from_example else "assets/template.html")
+    if a.from_example and not src.exists() and (SKILL / "examples" / a.from_example / "index.html").exists():
+        src = SKILL / "examples" / a.from_example / "index.html"   # a folder example: page + photos
+        for f in src.parent.rglob("*"):
+            if f.is_file() and f != src:
+                dst = d / f.relative_to(src.parent)
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy(f, dst)
     if not src.exists():
-        names = ", ".join(p.stem for p in sorted((SKILL / "examples").glob("*.html")))
+        ex = SKILL / "examples"
+        names = ", ".join(sorted([p.stem for p in ex.glob("*.html")] + [p.name for p in ex.iterdir() if (p / "index.html").exists()]))
         sys.exit(f"no example named '{a.from_example}' (have: {names})")
     html = src.read_text()
     if a.from_example:
         m = re.search(r'"bars":\s*(\d+)', html)
         ex_bars = int(m.group(1)) if m else None
+        if not (a.beats or a.bars or a.bpm):  # no song or grid given yet: keep the example's own grid
+            mb = re.search(r'"bpm":\s*([\d.]+)', html)
+            cfg["bars"] = ex_bars or cfg["bars"]
+            cfg["bpm"] = float(mb.group(1)) if mb else cfg["bpm"]
         if ex_bars and cfg["bars"] != ex_bars:
             print(f"note: the {a.from_example} timeline is {ex_bars} bars ({ex_bars * 4} beats) and this loop is "
                   f"{cfg['bars']} bars. Its keys past beat {cfg['bars'] * 4} wrap to the start (or it ends early), so "
@@ -76,6 +90,10 @@ def main():
         if a.accent is None:
             m = re.search(r'"accent":\s*("[^"]*"|null)', html)
             cfg["accent"] = json.loads(m.group(1)) if m else None  # keep the example's palette unless told otherwise
+        if not a.size:
+            m = re.search(r'"width":\s*(\d+),\s*"height":\s*(\d+)', html)
+            if m:
+                cfg["width"], cfg["height"] = int(m.group(1)), int(m.group(2))  # and its frame size
     html, n = re.subn(r"const CONFIG = \{.*?\};", "const CONFIG = " + json.dumps(cfg) + ";", html, count=1, flags=re.S)
     if n != 1:
         sys.exit(f"CONFIG block not found in {src}")

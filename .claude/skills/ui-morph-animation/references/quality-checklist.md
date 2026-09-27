@@ -46,3 +46,16 @@ half-beats.
 - [ ] After the render, spot-check two or three frames from the MP4
       (`ffmpeg -ss 8.62 -i loop.mp4 -frames:v 1 f.png`) for motion blur on fast edges and
       sharp text at rest.
+
+## Vertical formats, photos and brands (Reels, Stories, 4:5)
+- [ ] Every state sits inside the safe area (`K.safe`): nothing important under the header,
+      the caption, or the action buttons. The audit's margin check is clean.
+- [ ] Text reads on a phone: about 30 px or more of the 1080 px width, and nothing under 25.
+- [ ] The first second already shows the product or the place, and the hook plays from bar 1.
+- [ ] Photos are cropped on their subject (the sign, the boat's bow, the sun), with no
+      sliver of the card behind a settling photo and no chip covering the subject.
+- [ ] Text over a photo is legible over its darkest and lightest parts (flat tint plus a
+      soft dark shadow), and it sits on the calm part of the photo.
+- [ ] The brand's palette is used as the brand uses it (the main color for the big surfaces,
+      the accent for the moments), and the copy is in the audience's language.
+- [ ] The full-bleed moment lands on the music's drop.

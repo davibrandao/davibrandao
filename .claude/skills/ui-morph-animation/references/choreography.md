@@ -41,6 +41,13 @@ built end to end.
   stepper (guests) → like → notification → avatar stack → toast. Carried parts: the
   dropdown highlight → calendar hover dot → range pill; the bell badge → unread dot; the
   card avatars → the stack. This is `examples/trip-planner.html`.
+- **Travel Reel (9 states, 8 bars, 1080×1920, photos):** search → suggestion (with a photo
+  thumbnail) → photo card (swipe ×2) → calendar (range drag) → travellers stepper →
+  checklist → full-bleed photo (the drop) → WhatsApp chat → brand sign-off (segmented motto
+  with a liquid indicator). Carried parts: the thumbnail opens into the card; the hover dot
+  stretches into the date range; the WhatsApp button becomes the sent message; the typing
+  bubble becomes the reply. This is `examples/travel-reel/`. Swap the destination, photos,
+  palette and copy for another place or brand.
 - **Sign-up (8 states, 5–6 bars):** button → dropdown (plan) → pricing switch (price rolls) →
   stepper (seats) → text field (email) → OTP code → check → toast.
 - **Publish a shot (8 states, 5–6 bars):** button → upload (progress) → check → like →
@@ -92,6 +99,11 @@ built end to end.
 
 ## 4. The camera
 
+- **Vertical formats.** In a 1080×1920 Reel, a 300-wide state at zoom 2.2–2.6 fills the
+  width, and most states end up at similar zooms. Vary the state widths (280–320) and let
+  small states (a stepper, a pill) zoom in to 3+ so the camera still breathes. Pass the safe
+  area to `create()` and every state centres clear of the platform's UI. A full-bleed photo
+  is the one state allowed past it (`K.bleed`), and it makes the natural drop.
 - Set one zoom per state so it fills the frame: 55–85 % of the width for wide states and
   25–40 % for tiny ones (loader, toggle). Use `K.fit(w, h, fill)` or set the values by eye.
   In the reference, zooms range from 3.05 (palette) to 6.2 (loader).

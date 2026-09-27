@@ -204,6 +204,12 @@
     K.W = opts.width ?? opts.size ?? 1440;
     K.H = opts.height ?? opts.size ?? 1440;
     K.size = Math.min(K.W, K.H);
+    // Safe area: insets [top, right, bottom, left] the UI must stay out of (a Reel's header,
+    // caption and action buttons: about [220, 140, 420, 60] at 1080×1920). The camera centres
+    // states in it, K.fit sizes to it, and the audit measures the shape's margin against it.
+    const ins = opts.safe ?? [0, 0, 0, 0];
+    K.safe = { l: ins[3], t: ins[0], r: K.W - ins[1], b: K.H - ins[2] };
+    K.focus = opts.focus ?? [(K.safe.l + K.safe.r) / 2, (K.safe.t + K.safe.b) / 2];
     K.bpm = opts.bpm ?? 120;
     K.beatsPerBar = opts.beatsPerBar ?? 4;
     K.bars = opts.bars ?? 7;
@@ -370,12 +376,21 @@
       K._camera = (t) => ({ z: Math.exp(lz(t)), cx: cx(t), cy: cy(t) });
       return K._camera;
     };
-    // Zoom that makes a w×h box fill `fill` of the frame.
-    K.fit = (w, h, fill = 0.7) => Math.min((K.W * fill) / w, (K.H * fill) / h);
+    // Zoom that makes a w×h box fill `fill` of the safe area (the whole frame by default).
+    K.fit = (w, h, fill = 0.7) => Math.min(((K.safe.r - K.safe.l) * fill) / w, ((K.safe.b - K.safe.t) * fill) / h);
     K.camAt = (t) => (K._camera ? K._camera(t) : { z: 1, cx: 0, cy: 0 });
-    K.project = (t, p) => { const c = K.camAt(t); return [(p[0] - c.cx) * c.z + K.W / 2, (p[1] - c.cy) * c.z + K.H / 2]; };
-    K.unproject = (t, s) => { const c = K.camAt(t); return [(s[0] - K.W / 2) / c.z + c.cx, (s[1] - K.H / 2) / c.z + c.cy]; };
-    K.worldTransform = () => `translate(${K.W / 2}px, ${K.H / 2}px) scale(${K.cam.z}) translate(${-K.cam.cx}px, ${-K.cam.cy}px)`;
+    // the camera centre (cx, cy) lands on K.focus: the frame centre, or the safe area's
+    K.project = (t, p) => { const c = K.camAt(t); return [(p[0] - c.cx) * c.z + K.focus[0], (p[1] - c.cy) * c.z + K.focus[1]]; };
+    K.unproject = (t, s) => { const c = K.camAt(t); return [(s[0] - K.focus[0]) / c.z + c.cx, (s[1] - K.focus[1]) / c.z + c.cy]; };
+    K.worldTransform = () => `translate(${K.focus[0]}px, ${K.focus[1]}px) scale(${K.cam.z}) translate(${-K.cam.cx}px, ${-K.cam.cy}px)`;
+    // The world rect that covers the whole frame (plus `m` screen px past each edge) at time t:
+    // key a shape to it to go full-bleed. It follows the camera, so it stays full-bleed while
+    // the camera drifts. Returns { cx, cy, w, h } in world px. Mark the shape data-bleed while
+    // it's full-bleed so the audit doesn't flag it for touching the frame edge.
+    K.bleed = (t, m = 80) => {
+      const c = K.camAt(t);
+      return { cx: c.cx + (K.W / 2 - K.focus[0]) / c.z, cy: c.cy + (K.H / 2 - K.focus[1]) / c.z, w: (K.W + 2 * m) / c.z, h: (K.H + 2 * m) / c.z };
+    };
 
     // ---- cursor: stops at anchors on beats, moves with minimum-jerk + a slight arc.
     // keys: [[beat, anchor, {arc}], ...]; anchor = [x, y] in world space or (t) => [x, y].
@@ -568,7 +583,7 @@
       stage.appendChild(cursorEl);
       if (hud) {
         hudEl = document.createElement('div');
-        hudEl.style.cssText = 'position:absolute;left:24px;top:24px;z-index:99;font:600 30px/1.2 ui-monospace,Menlo,monospace;color:#000;background:rgba(255,255,255,.88);padding:10px 16px;border-radius:12px;white-space:nowrap;max-width:1392px;overflow:hidden;text-overflow:ellipsis';
+        hudEl.style.cssText = 'position:absolute;left:24px;top:24px;z-index:99;font:600 30px/1.2 ui-monospace,Menlo,monospace;color:#000;background:rgba(255,255,255,.88);padding:10px 16px;border-radius:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:' + (K.W - 48) + 'px';
         stage.appendChild(hudEl);
       }
       global.seek = K.seek;
@@ -683,9 +698,13 @@
         if (op > 0.25 && hasContent) (groups[L.group] ||= []).push(`${L.el.dataset.name || L.el.id || '?'} (${op.toFixed(2)})`);
       }
       for (const g in groups) if (groups[g].length > 1) out.push(`swap overlap in "${g}": ${groups[g].join(' + ')} visible together`);
-      if (sr) {
-        const m = Math.min(sr.left - stageR.left, stageR.right - sr.right, sr.top - stageR.top, stageR.bottom - sr.bottom);
-        if (m < (o.minMargin ?? 48)) out.push(`shape ${m < 0 ? 'off-frame' : 'crowds frame edge'} (margin ${m.toFixed(0)}px)`);
+      if (sr && !shape.hasAttribute('data-bleed')) {
+        // margin to the safe area (the frame edge unless K.safe was set), in frame px
+        const k = stageR.width / K.W, s = K.safe;
+        const m = Math.min(sr.left - stageR.left - s.l * k, stageR.left + s.r * k - sr.right,
+          sr.top - stageR.top - s.t * k, stageR.top + s.b * k - sr.bottom) / k;
+        const safe = s.l || s.t || s.r < K.W || s.b < K.H;
+        if (m < (o.minMargin ?? 48)) out.push(`shape ${m < 0 ? `outside the ${safe ? 'safe area' : 'frame'}` : `crowds the ${safe ? 'safe area' : 'frame'} edge`} (margin ${m.toFixed(0)}px)`);
       }
       return out;
     };

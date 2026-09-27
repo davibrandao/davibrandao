@@ -22,7 +22,14 @@ render scripts call.
 
 ```js
 const K = MorphKit.create({ bpm: 120, bars: 7, beatsPerBar: 4, beats: null, loop: true, size: 1440, cursorSize: 64 });
+// a Reel: const K = MorphKit.create({ ..., width: 1080, height: 1920, safe: [220, 140, 420, 60], cursorSize: 60 });
 ```
+- `width`/`height` (or `size` for a square) set the frame. `K.W`, `K.H`, and `K.size` (the
+  shorter side) read it back.
+- `safe: [top, right, bottom, left]` insets mark where platform UI covers the frame (a Reel's
+  header, caption and action buttons). `K.safe` is `{ l, t, r, b }`. The camera centres
+  every state on `K.focus` (the safe area's centre unless you pass `focus: [x, y]`), `K.fit`
+  sizes to the safe area, and the audit measures the shape's margin against it.
 - `beats`: optional measured beat times (s, relative to the loop start, `bars*4+1` of
   them). `new_project.py` passes them only when the song's tempo drifts. Otherwise the grid
   is exact from `bpm`.
@@ -120,6 +127,13 @@ K.css(el, { ...K.swap(v, { blur: 14, scale: 0.94, dy: 0 }), left: x, top: y });
   (color, weight, clipPath…).
 - `K.iconAt(el, x, y, size, v, color, extra)` places a size×size box centered at (x, y), with
   `color` feeding `currentColor`.
+- `K.photoAt(img, left, top, w, h, { fx, fy, zoom, r }, extra)` fills a world-px box with an
+  `<img>` like `object-fit: cover`, cropped around the focus point (fx, fy in 0..1 of the
+  image), with an optional `zoom` (drive it from time for a slow drift) and corner radius.
+  `extra` goes last: pass opacity, visibility and a blur filter for the swap, and leave the
+  filter off (`'none'`) once it's fully visible, since a filter on a large photo is slow to
+  render. `K.ready` waits for every `<img>` to decode, so frames never show a half-loaded
+  photo. `bundle.py` inlines local photos.
 - `K.splitClip(boxLeft, boxWidth, L, R, boxHeight?)` returns `{ inside, outside }`
   clip-path strings for a label whose box starts at `boxLeft` (world px), given a fill
   spanning [L, R]. Put `outside` on the base copy and `inside` on the inverted copy. No
@@ -132,9 +146,15 @@ K.camera([[0, 3.7], [2, 6.2], [24, 3.05, 0, 108, SP.camOut]], SP.cam);  // [beat
 K.css(world, { transform: K.worldTransform() });                          // inside frame(t)
 ```
 - Zoom springs in log space, because equal ratios feel like equal steps.
-  `K.fit(w, h, fill)` returns the zoom that makes a w×h box fill `fill` of the frame.
+  `K.fit(w, h, fill)` returns the zoom that makes a w×h box fill `fill` of the safe area
+  (the frame, unless `safe` was set).
 - `K.cam` is the current camera `{z, cx, cy}` during a frame. `K.project(t, [x, y])` and
-  `K.unproject(t, [sx, sy])` convert world ↔ screen.
+  `K.unproject(t, [sx, sy])` convert world ↔ screen. The camera centre lands on `K.focus`.
+- `K.bleed(t, m = 80)` returns the world rect `{ cx, cy, w, h }` that covers the whole frame
+  plus `m` screen px past each edge at time t. Key a state's w/h/cx/cy to functions of it to
+  go full-bleed: `w: (t) => K.bleed(t).w`. It follows the camera, so a slow push-in keeps it
+  full-bleed. While the shape covers the frame, set `shape.toggleAttribute('data-bleed', on)`
+  so the audit skips the margin check.
 - The world origin is the shape's resting center, and everything is laid out in world px.
 
 ## 7. Cursor and drags

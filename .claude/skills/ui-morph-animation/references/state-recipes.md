@@ -11,6 +11,8 @@ dropdown, date picker (range drag), stepper, like, notification and avatar stack
   scrub · volume slider · toggle · tabs · chart · ⌘K pill · command palette · toast
 - More: dropdown · stepper · text field · OTP code · like button · rating · notification ·
   avatar stack · date picker · upload · pagination dots · accordion · pricing switch
+- Photo and brand states: search with a thumbnail · photo card (swipe) · checklist ·
+  full-bleed photo · chat · sign-off
 - Numbers, text and icons
 
 ---
@@ -147,6 +149,44 @@ beat, so the heights trade and the card height is their sum.
 **Pricing switch**: "Monthly · Yearly" as a 220×48 segmented pill (a tabs recipe with two
 segments). Clicking flips the indicator, and the price below rolls digits (`$24 → $19`).
 The shape can grow to include the price.
+
+## Photo and brand states (built in `examples/travel-reel/`)
+
+**Search with a suggestion thumbnail**: a 300×56 white pill (search icon, placeholder, a gold
+go-button). Focus on the click, type 4 letters on 16ths, then the pill grows down (top
+anchored) into a 300×140 card with one suggestion row: a 52 px photo thumbnail, title
+15/600, subtitle 13/400. Hover tints the row; the click opens the thumbnail into the card.
+
+**Photo card (swipe)**: 320×420 r 30. A photo area on top (320 wide, 1 px overscan) and a
+solid panel below with the title (20/600), subtitle and a CTA pill. The first photo is the
+suggestion's thumbnail growing (`K.trackN` on its rect). Three photos sit side by side on a
+strip; `K.drag` follows the cursor while held and springs to the next photo on release
+(`rest: () => -320`). White glass chips (a solid 93 % white, never a blur-behind) sit at the
+bottom-left of the photo, and pagination dots in a dark pill at the bottom-right. The
+active dot is a pill whose width trades with its neighbours as the strip moves.
+
+**Checklist (progress on the beat)**: a 300×280 white card, title and subtitle, a 4 px gold
+progress line, three rows with a ring that fills gold as the check draws (one per beat, a
+consequence of the previous step), and a CTA that unlocks (navy 7 % → gold) once all are
+done. Hovering nudges its arrow. The click is the drop.
+
+**Full-bleed photo**: key the shape to `K.bleed(t)` (w, h, cx, cy). The photo sits still at
+the widest full-bleed rect, so the growing shape reveals it like a window opening, and a
+slow camera push (a 2.6 s spring) drifts it. A flat navy tint at 30 % and a soft dark text
+shadow make white copy legible. An eyebrow (12/600, tracked 0.26em) and a 30/600 title,
+then a white CTA pill that pops in on its own beat.
+
+**Chat (WhatsApp)**: a 300×252 white card with a header (a 36 px avatar monogram, name
+15/600, status 12/500 in the secondary color). The CTA pill from the previous state becomes
+the sent message: one element whose box, radius (with a 6 px tail corner) and color spring
+to a right-aligned navy bubble while its label swaps. Read receipts turn blue on the next
+beat, a typing bubble (three dots lifting in turn) grows into the reply, and a service chip
+closes it.
+
+**Sign-off (segmented motto)**: a 300×132 navy card with a tracked wordmark in the accent
+(pad the left by the tracking so it centres), and a segmented control of the brand's motto.
+The gold indicator follows the cursor's hover from segment to segment on the beat (lead and
+trail edges), with the labels inverting under it through `K.splitClip`.
 
 ## Numbers, text and icons
 

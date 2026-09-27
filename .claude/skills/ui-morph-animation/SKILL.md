@@ -1,14 +1,15 @@
 ---
 name: ui-morph-animation
-description: Make Dribbble-level looping UI motion videos where ONE shape morphs through 8–12 UI states (button, loader, check, dynamic island, music player, slider, toggle, tabs, chart, ⌘K palette, toast…) with a cursor doing real clicks and drags, cut to a song's beat grid. Builds a single 1440×1440 HTML animation in which every frame is a pure function of time (closed-form springs), analyzes the song with numpy for tempo and downbeats, places UI sounds by their measured peak, reviews one frame per beat, and renders a 60 fps motion-blurred MP4 with Playwright + ffmpeg. Use this whenever someone wants a UI animation, product motion shot, morphing-interface video, micro-interaction reel, beat-synced or music-synced UI animation, or a Dribbble/Instagram motion post, or pastes a prompt about a shape becoming different UI states on the beat, even if they never say "skill" or spell out the steps.
+description: Make Dribbble-level looping UI motion videos where ONE shape morphs through 8–12 UI states (button, loader, check, dynamic island, music player, slider, toggle, tabs, chart, ⌘K palette, toast, photo cards, chat…) with a cursor doing real clicks and drags, cut to a song's beat grid. Builds a single HTML animation (1440×1440 square, 1080×1920 Reel/Story or 1080×1350 feed, with real photos if given) in which every frame is a pure function of time (closed-form springs), analyzes the song with numpy for tempo and downbeats, or composes an original royalty-free track scored to the beat sheet, places UI sounds by their measured peak, reviews one frame per beat, and renders a 60 fps motion-blurred MP4 with Playwright + ffmpeg. Use this whenever someone wants a UI animation, product motion shot, morphing-interface video, micro-interaction reel, animated Instagram post or Reel for a product, brand or travel destination, beat-synced or music-synced UI animation, or a Dribbble/Instagram motion post, or pastes a prompt about a shape becoming different UI states on the beat, even if they never say "skill" or spell out the steps.
 compatibility: Python 3.9+ with numpy, pillow and playwright; ffmpeg on PATH (or pip imageio-ffmpeg); a Chromium that Playwright can launch (the scripts also find common preinstalled paths).
 ---
 
 # UI morph animation
 
 One element, never cut, becomes a sequence of UI states on the beat of a song while a
-cursor drives every change. The output is a seamless loop: an MP4 (1440×1440, 60 fps,
-motion blur, soundtrack) plus the single HTML file that produced it.
+cursor drives every change. The output is a seamless loop: an MP4 (60 fps, motion blur,
+soundtrack; 1440×1440 by default, or 1080×1920 for a Reel/Story and 1080×1350 for a feed
+post) plus the single HTML file that produced it.
 
 The craft lives in three places, and this skill covers each:
 - **Choreography**: which state lands on which beat, and what the cursor does.
@@ -22,7 +23,10 @@ volume past max, types, and presses enter. Read it before building. It shows eve
 below working together, and most new states are variations of something in it.
 `examples/trip-planner.html` is a second build (6 bars at 124 BPM, one accent) on different
 states: search bar → dropdown → date range → stepper → like → notification → avatar stack →
-toast. Read it when the requested states overlap those.
+toast. Read it when the requested states overlap those. `examples/travel-reel/` is a 1080×1920
+Instagram Reel with real photos and a composed soundtrack (8 bars, brand palette): search →
+suggestion → swipeable photo card → date range → travellers → checklist → full-bleed photo on
+the drop → WhatsApp chat → sign-off. Read it for any vertical format, photo, or brand post.
 
 Paths: `$SKILL` below means this skill's folder. Run everything from the user's working
 directory, so the song, `beats.json` and the project folder live there, never inside
@@ -53,8 +57,7 @@ directory, so the song, `beats.json` and the project folder live there, never in
 
 ### 1. Ask for the inputs, and nothing else yet
 
-Ask for three things in one message. Give each a default so "defaults" is a complete
-answer:
+Ask for these in one message. Give each a default so "defaults" is a complete answer:
 1. **8–12 UI states** for the shape to become, in order. The default is the reference's
    12: button → loader → check → dynamic island → music player → volume slider → toggle →
    tabs → chart → ⌘K pill → command palette → toast (→ button). Scrubbing, typing and
@@ -63,23 +66,39 @@ answer:
    plus the pre-checked alternative chains in `references/choreography.md` §1b.
    `references/state-recipes.md` lists every state they can mix in.
 2. **Pure black and white (the default), or one accent color** as a hex value.
-3. **A royalty-free song around 120 BPM**, as a local path or a URL, or by dropping the file
-   into the working folder. Mixkit is a good source: its tracks are free for commercial use
-   in videos, and the user should read the license on the chosen track's page. Sandboxed
-   sessions often block music hosts. If `curl -sI <url>` fails, ask for the file instead.
-   With no song yet, the default is `$SKILL/scripts/placeholder_track.py` (a synthetic
-   groove) as a timing stand-in. Say so up front. Before the final render, ask once more
-   for the real track, and re-analyze and re-time when it arrives. If none comes, deliver
-   with the placeholder and label it as one.
+3. **Music: an original composed track (the default), or a royalty-free song around
+   120 BPM.** `$SKILL/scripts/compose.py` writes an original, loop-perfect track scored to the
+   beat sheet (a riser into the key moment, an impact on it, a fill into the seam). It is
+   synthesized from scratch, so it is safe to post: no license, nothing for Content ID to
+   match. For a song instead, take a local path, a URL, or a file dropped into the working
+   folder. Mixkit is a good source (free for commercial use in videos; the user should read
+   the chosen track's license). Sandboxed sessions often block music hosts. If
+   `curl -sI <url>` fails, ask for the file instead.
+4. **Format:** square 1440×1440 (default, Dribbble/feed), 1080×1920 (Reel, Story, TikTok,
+   Shorts), or 1080×1350 (4:5 feed). For a brand or a place, also ask for **photos** and the
+   brand's colors. Photos turn states into cards, and one full-bleed photo is the natural
+   climax (see `examples/travel-reel/`).
 
-Also mention the output format once: a 1440×1440 square MP4 at 60 fps with sound, plus a
-self-contained HTML file. The loop runs roughly 1.2–1.5 s per state at 120 BPM: about 14 s
-for 12 states, and 10–12 s for 8.
+The loop runs roughly 1.2–1.5 s per state at 120 BPM: about 14 s for 12 states, and 10–12 s
+for 8. The output is an MP4 at 60 fps with sound, plus a self-contained HTML file.
 
-If the user already gave all three, skip straight to step 2. Don't write animation code
+If the user already gave these, skip straight to step 2. Don't write animation code
 before step 3 is approved.
 
-### 2. Analyze the song
+### 2. Analyze the song (or plan the composed track)
+
+With a composed track there is nothing to analyze: pick the bars from the interactions
+(below) and the beat of the key moment, and compose after the plan is approved:
+
+```bash
+python3 $SKILL/scripts/compose.py music.wav --bars 8 --key F --drop 20   # → music.wav + music.beats.json
+```
+
+It is tropical house with a Nordeste accent (marimba hook, forró triangle, pan-flute lead on
+the drop). `--energy 2,2,3,3,3,4,4,3` shapes the arc per bar, `--chords "vi IV I V"` sets the
+harmony, `--drop` puts the impact on the state that deserves it, and `--build` sets how many
+beats the riser takes. It prints the chord and energy map, and the levels. Details are in
+`references/audio.md` §6. With a real song, analyze it:
 
 ```bash
 pip install numpy pillow playwright   # plus ffmpeg on PATH (or: pip install imageio-ffmpeg)
@@ -112,15 +131,24 @@ cheapest moment to change the story.
 ### 4. Build
 
 ```bash
-python3 $SKILL/scripts/new_project.py morph-loop --beats beats.json --song song.mp3 [--accent '#FF4F1A'] [--from-example [reference|trip-planner]]
+python3 $SKILL/scripts/new_project.py morph-loop --beats beats.json --song song.mp3 [--size 1080x1920] [--accent '#FF4F1A'] [--from-example [reference|trip-planner|travel-reel]]
 ```
 
-This writes `index.html` (the beat grid is already in `CONFIG`), `morph-kit.js`, the
-font, a UI sound kit, and a music-only `mix.wav`. Pass `--from-example` (the reference) or
-`--from-example trip-planner` only when most of the chosen states are in that build. Its
-timeline must be re-timed for any other length, and the script warns you. Otherwise, start
-from the template and copy patterns out of the examples. Both use the same layout: content in world px under `#origin`, inside the
-one `#shape`. Build in this order, because each layer depends on the one before:
+This writes `index.html` (the beat grid and frame size are already in `CONFIG`),
+`morph-kit.js`, the font, a UI sound kit, and a music-only `mix.wav`. Pass `--from-example`
+(the reference), `--from-example trip-planner`, or `--from-example travel-reel` only when
+most of the chosen states are in that build. Its timeline must be re-timed for any other
+length, and the script warns you. Otherwise, start from the template and copy patterns out
+of the examples. They all share one layout: content in world px under `#origin`, inside the
+one `#shape`.
+
+With a composed track, scaffold with `--beats music.beats.json --song music.wav`, then
+retune the success chime to its key with `ui_sounds.py morph-loop/sounds --key F`. Photos go in `morph-loop/photos/` as `<img>` elements under `#origin`, placed with
+`K.photoAt` (cover-fit around a focus point). For a Reel, pass `safe: [220, 140, 420, 60]`
+to `MorphKit.create`, so the camera centres every state clear of Instagram's header, caption
+and buttons.
+
+Build in this order, because each layer depends on the one before:
 
 1. `PLAN`: the beat sheet from step 3, registered with `K.event()`. Add sounds with `K.cue()`.
 2. `GEO`: the one shape per state (w, h, r, bg, optional cx/cy), turned into tracks.
@@ -164,11 +192,14 @@ python3 $SKILL/scripts/bundle.py morph-loop                                     
 
 `render.py` takes 4 subframes per frame across a 180° shutter, blends them with ffmpeg
 `tmix` to 60 fps, mixes the song section with a loop crossfade, and adds UI sounds placed
-by their peak. Use `--preview` for a fast half-size draft, `--loops 3` for a longer post,
-and `--gif` for a 720 px GIF. A 14 s loop renders in about 2 minutes on 4 cores. Deliver
-`loop.mp4`, `dist/loop.html` (self-contained, font and audio inlined), and the review sheet.
-Say what's left to tweak. The usual suspects are the UI sound level (`--ui-db`), a state's
-zoom, and a label.
+by their peak. With a composed track, pass `--song music.wav --beats music.beats.json`; it
+already continues into itself, so no crossfade is applied. Use `--preview` for a fast
+half-size draft, `--loops 3` for a longer post, and `--gif` for a 720 px GIF. A 14 s square
+loop renders in about 2 minutes on 4 cores; a 16 s Reel in about 3. Deliver `loop.mp4`,
+`dist/loop.html` (self-contained, font, photos and audio inlined), a cover frame
+(`review/beat_XX.png` of the strongest state), and the review sheet. Say what's left to
+tweak. The usual suspects are the UI sound level (`--ui-db`; about -6 over a dense composed
+track), a state's zoom, and a label.
 
 ## Build rules, and why
 
@@ -210,6 +241,8 @@ const clip = K.splitClip(boxLeft, boxW, L, R);                     // halo-free 
 const cellKeys = K.steps((t) => cellUnderCursor(t), 7, 9, { sound: 'tick' }); // snap a drag's steps to 16ths
 const drawn = clamp(K.since(t, 27, 26) / 0.3);                     // loop-aware "since beat 27", element appears at 26
 K.camera([[0, 3.7], [2, 6.2], [24, 3.05, 0, 108]], SP.cam);       // [beat, zoom, cx, cy, spring?]
+K.photoAt(img, left, top, w, h, { fx: 0.7, fy: 0.5, zoom, r });     // a photo, cover-fit around a focus point
+const GEO_full = { w: (t) => K.bleed(t).w, h: (t) => K.bleed(t).h, cx: (t) => K.bleed(t).cx, cy: (t) => K.bleed(t).cy }; // full-bleed state
 K.cursor([[0.75, [50, 12]], [2, [50, 12]], [9, (t) => thumbAt(t)]], [[1.75, 2], [10, 11.5]]);
 const prog = K.drag({ press: 10, release: 11.5, map: (p) => clamp((p[0] + 124) / 248), before: playing });
 K.onFrame((t) => { K.css(world, { transform: K.worldTransform() }); /* … every dynamic style … */ });
@@ -248,6 +281,15 @@ The full API, with the reasons behind each default, is in `references/kit-api.md
   join treatment.
 - **Fonts need http.** Preview with `serve.py`, not `file://`. `bundle.py` inlines everything
   for the shareable single file.
+- **Vertical formats are read on phones.** Keep on-screen text at 30 px or more of the
+  1080 px width (`review.py --min-text 25` at the least) and keep the shape inside
+  `K.safe`. A full-bleed state is the exception: mark the shape `data-bleed` while it
+  covers the frame, and the audit skips its margin check.
+- **Photos:** give a card photo 1 px of overscan so a settling spring never shows a sliver of
+  the card behind it. Text over a photo needs a flat tint (`rgba(navy, .3)`) and a soft dark
+  shadow, never a gradient scrim. Keep the photo still and let the camera or a slow `zoom`
+  drift move it. Emoji need a color-emoji font that headless Chromium usually lacks, so
+  use icons instead.
 
 ## Files
 
@@ -255,13 +297,15 @@ The full API, with the reasons behind each default, is in `references/kit-api.md
   audit, dev player).
 - `assets/template.html`: a minimal scaffold. `examples/reference.html` (7 bars, B&W) and
   `examples/trip-planner.html` (6 bars, accent) are full builds.
-- `scripts/`: `analyze_beats.py`, `new_project.py`, `review.py`, `render.py`, `bundle.py`,
-  `serve.py`, `mix_audio.py`, `ui_sounds.py`, `placeholder_track.py`, `common.py`.
+- `examples/travel-reel/`: a 1080×1920 Reel with photos, a brand palette and a composed
+  track (`index.html`, `photos/`, and the `compose.py` command in its header).
+- `scripts/`: `analyze_beats.py`, `compose.py`, `new_project.py`, `review.py`, `render.py`,
+  `bundle.py`, `serve.py`, `mix_audio.py`, `ui_sounds.py`, `placeholder_track.py`, `common.py`.
 - `references/choreography.md`: planning the beat grid, the plan format, cursor and camera
   direction, and the reference's beat sheet as a worked example.
 - `references/state-recipes.md`: 25 states with sizes, content, continuity, interaction,
   and sound.
 - `references/kit-api.md`: the kit, function by function.
-- `references/audio.md`: beat analysis, picking the loop, sound design and placement, and
-  mixing.
+- `references/audio.md`: beat analysis, picking the loop, sound design and placement,
+  mixing, and composing an original track.
 - `references/quality-checklist.md`: the by-eye review list.

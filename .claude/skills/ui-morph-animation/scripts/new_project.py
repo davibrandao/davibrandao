@@ -6,9 +6,11 @@ DIR/morph-kit.js, DIR/Geist-Variable.woff2, DIR/sounds/ (UI kit) and, when a son
 beats.json are given, DIR/mix.wav (music only) so the dev player has sound right away.
 
 usage: new_project.py DIR [--beats beats.json] [--song SONG] [--bars 7] [--bpm 120]
-                          [--accent '#FF4F1A'] [--from-example] [--force]
---from-example starts from examples/reference.html (the full 7-bar loop) instead of the
-minimal template — faster when the requested states overlap with it.
+                          [--accent '#FF4F1A'] [--from-example [reference|trip-planner]] [--force]
+--from-example starts from a finished build in examples/ instead of the minimal template —
+faster when most requested states are in it. reference: button → … → toast (7 bars, B&W);
+trip-planner: search → dropdown → date range → stepper → like → notification → avatars →
+toast (6 bars, one accent).
 """
 import argparse
 import json
@@ -30,7 +32,7 @@ def main():
     ap.add_argument("--bars", type=int, default=None)
     ap.add_argument("--bpm", type=float, default=None)
     ap.add_argument("--accent", default=None, help="one accent color, e.g. '#FF4F1A' (omit for pure black and white)")
-    ap.add_argument("--from-example", action="store_true")
+    ap.add_argument("--from-example", nargs="?", const="reference", default=None, metavar="NAME")
     ap.add_argument("--force", action="store_true")
     a = ap.parse_args()
 
@@ -53,12 +55,21 @@ def main():
     if a.bpm:
         cfg["bpm"] = a.bpm
 
-    src = SKILL / ("examples/reference.html" if a.from_example else "assets/template.html")
-    if a.from_example and cfg["bars"] != 7:
-        print(f"note: the reference timeline is 7 bars (28 beats) and this loop is {cfg['bars']} bars. Keys past beat "
-              f"{cfg['bars'] * 4} wrap to the start, so re-time PLAN, CAM, the cursor keys and presence windows "
-              f"before the first review.", file=sys.stderr)
+    src = SKILL / (f"examples/{a.from_example}.html" if a.from_example else "assets/template.html")
+    if not src.exists():
+        names = ", ".join(p.stem for p in sorted((SKILL / "examples").glob("*.html")))
+        sys.exit(f"no example named '{a.from_example}' (have: {names})")
     html = src.read_text()
+    if a.from_example:
+        m = re.search(r'"bars":\s*(\d+)', html)
+        ex_bars = int(m.group(1)) if m else None
+        if ex_bars and cfg["bars"] != ex_bars:
+            print(f"note: the {a.from_example} timeline is {ex_bars} bars ({ex_bars * 4} beats) and this loop is "
+                  f"{cfg['bars']} bars. Its keys past beat {cfg['bars'] * 4} wrap to the start (or it ends early), so "
+                  f"re-time PLAN, CAM, the cursor keys and presence windows before the first review.", file=sys.stderr)
+        if a.accent is None:
+            m = re.search(r'"accent":\s*("[^"]*"|null)', html)
+            cfg["accent"] = json.loads(m.group(1)) if m else None  # keep the example's palette unless told otherwise
     html, n = re.subn(r"const CONFIG = \{.*?\};", "const CONFIG = " + json.dumps(cfg) + ";", html, count=1, flags=re.S)
     if n != 1:
         sys.exit(f"CONFIG block not found in {src}")

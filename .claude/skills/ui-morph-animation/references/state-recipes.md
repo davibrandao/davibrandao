@@ -2,8 +2,9 @@
 
 Sizes are world px at real 1× UI scale, and the camera zooms them. "Carries" names the part
 that should survive into or out of the state. Code for the reference's 12 states, plus the
-scrub interaction inside the player, lives in `examples/reference.html`. The rest follow the
-same patterns.
+scrub interaction inside the player, lives in `examples/reference.html`. Code for the
+dropdown, date picker (range drag), stepper, like, notification and avatar stack lives in
+`examples/trip-planner.html`. The rest follow the same patterns.
 
 ## Contents
 - Built in the reference: button · loader · check · dynamic island · music player ·

@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Morph loop — trip planner</title>
+<!--
+  6 bars at 124 BPM, something on every beat.
+  search bar → dropdown → date picker (drag a range) → stepper → like → notification →
+  avatar stack → toast → search bar. One shape, never cut. One accent (#3B5BFF), spent on
+  the date range, the like, the unread badge/dot and the "sent" check.
+  Carried parts: the dropdown highlight becomes the calendar's hover dot, then the range
+  pill; the bell's badge becomes the card's unread dot; the notification's avatars become
+  the avatar stack.
+  Read PLAN (the beat sheet), then GEO (the one shape), then the driven values, then frame(t).
+  Second example of the skill (the first is reference.html). Built by an agent using only the
+  skill, on states the reference doesn't cover. Patterns worth copying: top-anchored dropdown
+  and calendar, a grid-snapped range drag (K.steps) with numbers inverting under it, digit
+  rolls, a badge that becomes an unread dot, avatars carried from a card into a stack, and a
+  toast that resizes to fit its label.
+-->
+<style>
+  @font-face { font-family: 'Geist'; src: url('Geist-Variable.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
+  html, body { margin: 0; background: #ECEAE6; }
+  #stage {
+    position: relative; width: 1440px; height: 1440px; overflow: hidden; background: #ECEAE6;
+    font-family: 'Geist', system-ui, sans-serif; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;
+  }
+  /* No will-change anywhere under #world: the camera scales it and text must re-rasterize crisp. */
+  #world { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+  #shape { position: absolute; overflow: hidden; }
+  #origin { position: absolute; width: 0; height: 0; }
+  #origin > * { position: absolute; }
+  .t { white-space: nowrap; letter-spacing: -0.01em; }
+  .num { font-variant-numeric: tabular-nums; }
+  svg { display: block; overflow: visible; }
+  /* digit rolls: a clipped cell holding a vertical strip of digits */
+  .roll { display: inline-block; overflow: hidden; height: 1.2em; vertical-align: top; }
+  .strip { display: flex; flex-direction: column; }
+  .strip > span { display: block; height: 1.2em; line-height: 1.2em; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="world">
+    <div id="shape" data-shape>
+      <div id="origin">
+        <div id="blob"></div>
+        <div id="endA"></div><div id="endB"></div>
+        <!-- search bar -->
+        <div id="ph" class="t" data-name="placeholder">Where to?</div>
+        <div id="typed" class="t" data-name="typed"></div>
+        <div id="caret"></div>
+        <div id="sBtn"><div id="sBtnIcon"></div><div id="sBtnLabel" class="t">Search</div></div>
+        <!-- dropdown -->
+        <div id="divider"></div>
+        <!-- date picker (days are generated) -->
+        <div id="month" class="t" data-name="month">May 2026</div>
+        <div id="rangeLbl" class="t num" data-name="range">May 12 – 16</div>
+        <div id="chevL"></div><div id="chevR"></div>
+        <!-- stepper -->
+        <div id="minus"></div><div id="plus"></div>
+        <div id="guests" class="t" data-name="guests"><span class="roll num"><span class="strip" id="gStrip"><span>2</span><span>3</span><span>4</span></span></span><span id="gWord">guests</span></div>
+        <!-- like -->
+        <div id="heart"></div>
+        <div id="likes" class="t num" data-name="likes"><span>31</span><span class="roll"><span class="strip" id="lStrip"><span>8</span><span>9</span></span></span></div>
+        <!-- notification -->
+        <div id="bell" data-name="bell"></div>
+        <div id="avM" class="t">M</div>
+        <div id="avJ" class="t">J</div>
+        <div id="avA" class="t">A</div>
+        <div id="badge"><span id="badgeN" class="t num">1</span></div>
+        <div id="nTitle1" class="t" data-name="n-title">Maya joined your trip</div>
+        <div id="nTitle2" class="t" data-name="n-title-2">Maya and Jon joined</div>
+        <div id="nBody" class="t num">Lisbon · May 12 – 16</div>
+        <div id="nTime" class="t">now</div>
+        <!-- avatar stack -->
+        <div id="addBtn"></div>
+        <!-- toast -->
+        <svg id="tIcon" width="24" height="24" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9.5" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="2.2"/>
+          <circle id="tiArc" cx="12" cy="12" r="9.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" transform="rotate(-90 12 12)"/>
+          <circle id="tiDisc" cx="12" cy="12" r="11"/>
+          <path id="tiCheck" d="M7.6 12.3l3 3 5.8-6" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div id="tText1" class="t" data-name="toast-sending">Sending invite…</div>
+        <div id="tText2" class="t" data-name="toast-sent">Invite sent</div>
+        <div id="tUndo" class="t" data-name="toast-undo">Undo</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="morph-kit.js"></script>
+<script>
+/* CONFIG — written by new_project.py from the beat analysis. */
+const CONFIG = {"bpm": 124.0, "bars": 6, "beats": null, "accent": "#3B5BFF", "audio": "mix.wav"};
+/* END CONFIG */
+
+const { spring, lerp, clamp, minjerk, mixHex, icon, ICONS } = MorphKit;
+const K = MorphKit.create({ bpm: CONFIG.bpm, bars: CONFIG.bars, beats: CONFIG.beats });
+const B = K.b; // beats → seconds
+
+// ---------------------------------------------------------------- palette
+const INK = '#0B0B0C', PAPER = '#FFFFFF';
+const ACC = CONFIG.accent || INK;          // one accent: range, like, badge, sent check
+const HL = mixHex(PAPER, INK, 0.05);       // hovered row / cell
+const PRESSED = mixHex(PAPER, INK, 0.11);  // row under a press
+const BAND = mixHex(PAPER, ACC, 0.14);     // a committed range: light band between solid ends
+const W56 = 'rgba(255,255,255,.56)', W40 = 'rgba(255,255,255,.4)', W12 = 'rgba(255,255,255,.12)';
+const I40 = 'rgba(11,11,12,.4)', I50 = 'rgba(11,11,12,.5)', I60 = 'rgba(11,11,12,.6)', I10 = 'rgba(11,11,12,.1)', I08 = 'rgba(11,11,12,.08)';
+const AV = { M: ['#DCD5CA', INK], J: ['#8C857B', PAPER], A: ['#C3BBAF', INK] }; // warm neutrals, outside the accent budget
+
+// icons: extend the kit's 24-grid family (round caps and joins, one stroke weight)
+Object.assign(ICONS, {
+  pin: 'M12 20.5c-3.6-3.3-6.5-6.6-6.5-10.2a6.5 6.5 0 0 1 13 0c0 3.6-2.9 6.9-6.5 10.2zM12 12.4a2.3 2.3 0 1 0 0-4.6 2.3 2.3 0 0 0 0 4.6z',
+  minus: 'M5.5 12h13',
+  chevronLeft: 'M14.5 6l-6 6 6 6',
+});
+
+// ---------------------------------------------------------------- springs (tiny overshoot at most)
+const SP = {
+  morph: spring(0.55, 0.12), big: spring(0.62, 0.1), snap: spring(0.3, 0.1), press: spring(0.16, 0),
+  color: spring(0.45, 0), cam: spring(0.95, 0), camOut: spring(0.5, 0), lead: spring(0.3, 0.14), trail: spring(0.62, 0.04),
+};
+
+// ---------------------------------------------------------------- the beat sheet
+const PLAN = [
+  [0, 'search', 'toast → search bar'],  [1, null, 'click → focus'],     [1.5, null, 'type "Lis"'],       [2, 'dropdown', 'menu drops down'],
+  [3, null, 'hover Lisburn'],           [4, null, 'hover Lisbon'],       [5, 'date', 'click → calendar'], [6, null, 'hover on 12'],
+  [7, null, 'grab 12'],                 [9, null, 'release → May 12 – 16'],
+  [10, 'stepper', 'calendar → stepper'], [11, null, '+ → 3 guests'],    [12, null, '+ → 4 guests'],
+  [13, 'like', 'stepper → like'],       [14, null, 'like → 319'],
+  [15, 'bell', 'like → bell'],          [15.5, null, 'badge 1'],         [16, 'notif', 'click → notification'], [17, null, 'Jon joined'],
+  [18, 'stack', 'click → avatars'],     [19, null, 'hover → spread + invite'], [20, null, 'hover invite'],
+  [21, 'toast', 'click → sending'],     [21.5, null, 'progress'],        [22, null, 'invite sent'],       [23, null, 'undo'],
+];
+PLAN.forEach(([b, , label]) => K.event(b, label));
+[[0, 'pop', 0.45], [1, 'click'], [1.5, 'key1', 0.8], [1.75, 'key2', 0.8], [2, 'key3', 0.8], [2, 'pop', 0.4],
+ [3, 'tick', 0.35], [4, 'tick', 0.4], [5, 'click'], [5, 'whoosh', 0.3], [6, 'tick', 0.35], [7, 'tap', 0.75],
+ [9, 'pop', 0.5], [10, 'pop_down', 0.5], [11, 'click'], [12, 'click'], [13, 'pop', 0.45], [14, 'click'], [14, 'pop', 0.4],
+ [15, 'pop_down', 0.45], [15.5, 'tick', 0.5], [16, 'click'], [16, 'whoosh', 0.3], [17, 'pop', 0.45],
+ [18, 'click'], [18, 'pop_down', 0.4], [19, 'pop', 0.4], [20, 'tick', 0.35], [21, 'click'], [21.5, 'tick', 0.3],
+ [22, 'success', 0.8], [23, 'pop', 0.35],
+].forEach(([b, s, g]) => K.cue(b, s, g ?? 0.9));
+
+// ---------------------------------------------------------------- layout constants (world px, real 1x UI sizes)
+const TOP = -28;                              // dropdown + calendar grow down from the bar's top edge
+const DD_H = 232, CAL_H = 292;
+const ROW_Y = [60, 112, 164];                 // dropdown rows, 52 px apart
+const ROWS = [['Lisbon', 'Portugal'], ['Lisburn', 'Northern Ireland'], ['Lismore', 'Australia']];
+const COLX = (j) => (j - 3) * 38;             // calendar columns (Mon-first)
+const WEEKY = (k) => 76 + 38 * k;             // calendar week rows
+const FIRST_DOW = 4;                          // May 1 2026 is a Friday
+const dayPos = (d) => { const i = d - 1 + FIRST_DOW; return [i % 7, Math.floor(i / 7)]; };
+const dayAt = (j, k) => { const d = k * 7 + j - FIRST_DOW + 1; return d >= 1 && d <= 31 ? d : null; };
+const RANGE_ROW = 2, R0 = 12, R1 = 16;        // May 11–17: the range 12–16 lives on one row
+const TOAST_W = { sending: 182, sent: 146, undo: 206 };   // fitted to the measured labels
+
+// ---------------------------------------------------------------- the one shape
+const GEO = {
+  search:   { w: 320, h: 56, r: 28, bg: PAPER },
+  dropdown: { w: 320, h: DD_H, r: 26, cy: TOP + DD_H / 2, bg: PAPER },
+  date:     { w: 300, h: CAL_H, r: 28, cy: TOP + CAL_H / 2, bg: PAPER },
+  stepper:  { w: 196, h: 56, r: 28, bg: INK },
+  like:     { w: 124, h: 56, r: 28, bg: INK },
+  bell:     { w: 56, h: 56, r: 28, bg: INK },
+  notif:    { w: 304, h: 80, r: 28, bg: INK },
+  stack:    { w: 112, h: 56, r: 28, bg: PAPER },
+  toast:    { w: TOAST_W.sending, h: 56, r: 28, bg: INK },
+};
+const SPRING_FOR = { dropdown: SP.big, date: SP.big, notif: SP.big };
+const stateKeys = (prop, dflt) => PLAN.filter((p) => p[1]).map(([b, s]) => [b, GEO[s][prop] ?? dflt, SPRING_FOR[s] || SP.morph]);
+const byBeat = (a, b) => a[0] - b[0];
+// extra width keys: the stack widens as it spreads; the toast breathes with its label
+const SW = K.track([...stateKeys('w'), [19, 188], [22, TOAST_W.sent], [23, TOAST_W.undo]].sort(byBeat), SP.morph);
+const SH = K.track(stateKeys('h'), SP.morph), SR = K.track(stateKeys('r'), SP.morph);
+const SCX = K.track(stateKeys('cx', 0), SP.morph), SCY = K.track(stateKeys('cy', 0), SP.morph);
+const SBG = K.colorTrack([...stateKeys('bg'), [14, ACC, SP.color]].sort(byBeat), SP.color);
+const SQUISH = K.track([[0, 0], [0.75, 1], [1, 0], [13.75, 1], [14, 0], [15.75, 1], [16, 0], [17.75, 1], [18, 0]], SP.press);
+
+// ---------------------------------------------------------------- camera: each state fills the frame
+const CAM = [
+  [0, 3.45], [2, 3.3, 0, TOP + DD_H / 2], [5, 3.5, 0, TOP + CAL_H / 2], [10, 4.7], [13, 5.9], [15, 7.0],
+  [16, 3.7], [18, 5.8], [19, 4.4], [21, 5.4],
+];
+// pull back as fast as the shape grows (or it overfills the frame); push in slowly, like an operator
+const zoomOut = (i) => CAM[i][1] < CAM[(i + CAM.length - 1) % CAM.length][1];
+K.camera(CAM.map(([b, z, cx = 0, cy = 0], i) => [b, z, cx, cy, zoomOut(i) ? SP.camOut : SP.cam]), SP.cam);
+
+// ---------------------------------------------------------------- cursor: real clicks and one real drag
+const C_SEARCH = [-36, 6], C_ROW1 = [34, 60], C_12 = [-80, 148], C_16 = [70, 150], C_PLUS = [70, 2], C_HEART = [-20, 4];
+const C_PARK = [178, 40], C_ADD = [66, 4], C_AWAY = [118, 52];
+K.cursor([
+  [0.5, C_SEARCH], [1, C_SEARCH], [1.75, C_PARK], [2.25, C_PARK],
+  [3, [96, 110]], [4, C_ROW1], [5, C_ROW1],
+  [6, C_12], [7, C_12], [8.75, C_16, { drag: true }], [9, C_16],
+  [10.5, C_PLUS], [11, C_PLUS], [12, C_PLUS],
+  [13.5, C_HEART, { arc: -0.15 }], [14, C_HEART], [14.75, [40, 34]], [15.5, [2, 4]], [16, [2, 4]],
+  [16.75, [120, 62]], [17.5, [44, 6]], [18, [44, 6]],
+  [19, [6, 12]], [20, C_ADD], [21, C_ADD], [22, C_AWAY], [23, C_AWAY],
+], [[0.75, 1], [4.75, 5], [7, 9], [10.75, 11], [11.75, 12], [13.75, 14], [15.75, 16], [17.75, 18], [20.75, 21]]);
+
+// While the cursor drags, the range's end is the cell under it, sampled on 16ths (K.steps) so
+// every step and its tick land on the grid. Sampled once at startup: deterministic.
+const cellAt = (p) => [clamp(Math.round(p[0] / 38 + 3), 0, 6), clamp(Math.round((p[1] - WEEKY(0)) / 38), 0, 4)];
+const RANGE = K.steps((t) => Math.max(dayPos(R0)[0], cellAt(K.cursorAt(t).world)[0]), 7, 9,
+  { label: (j) => `range → ${dayAt(j, RANGE_ROW)}`, sound: 'tick', gain: 0.45 }).slice(1); // changes only
+
+// ---------------------------------------------------------------- the blob: dropdown highlight → calendar hover dot →
+// range pill → committed band. One element, never cut. keys: [beat, L, R, T, B, radius, {all}?];
+// each edge takes the fast spring when it leads the motion and the slow one when it trails (liquid).
+const rowHL = (i) => [-152, 152, ROW_Y[i] - 24, ROW_Y[i] + 24, 14];
+const dot = (j, k, r = 17) => [COLX(j) - r, COLX(j) + r, WEEKY(k) - r, WEEKY(k) + r, r];
+const BLOB = [
+  [0, ...rowHL(1)],                                       // parked on row 2 (hidden) — where it appears at 3
+  [4, ...rowHL(0)],                                       // hover slides up to "Lisbon"
+  [5.25, ...dot(...dayPos(R0)), { all: SP.morph }],       // after the click, the highlight shrinks onto 12 (one clean morph)
+  ...RANGE.map(([q, j]) => [q, COLX(dayPos(R0)[0]) - 17, COLX(j) + 17, WEEKY(RANGE_ROW) - 17, WEEKY(RANGE_ROW) + 17, 17]),
+].sort(byBeat);
+function blobTracks(keys) {
+  const tr = { L: [], R: [], T: [], B: [], rad: [] };
+  let prev = keys[keys.length - 1];
+  const sp = (d, leading) => (Math.abs(d) < 0.5 ? SP.morph : (d > 0) === leading ? SP.lead : SP.trail);
+  for (const k of keys) {
+    const [b, L, R, T, Bo, rad, o = {}] = k;
+    const dx = (L + R) / 2 - (prev[1] + prev[2]) / 2, dy = (T + Bo) / 2 - (prev[3] + prev[4]) / 2;
+    tr.L.push([b, L, o.all || sp(dx, false)]); tr.R.push([b, R, o.all || sp(dx, true)]);
+    tr.T.push([b, T, o.all || sp(dy, false)]); tr.B.push([b, Bo, o.all || sp(dy, true)]);
+    tr.rad.push([b, rad, o.all || SP.morph]);
+    prev = k;
+  }
+  return Object.fromEntries(Object.entries(tr).map(([n, ks]) => [n, K.track(ks, SP.morph)]));
+}
+const BLB = blobTracks(BLOB);
+const BCOL = K.colorTrack([[0, HL], [4.75, PRESSED, SP.press], [5, HL], [7, ACC], [9, BAND]], SP.color);
+const ACCAMT = K.track([[0, 0], [7, 1]], SP.color);    // how "accent" the blob is (inverts the numbers under it)
+const COMMIT = K.track([[0, 0], [9, 1]], SP.color);    // release: the middle of the range turns into a light band
+
+// ---------------------------------------------------------------- driven values
+const KEYS = [[1.5, 'L'], [1.75, 'i'], [2, 's']];
+const typedAt = (t) => (t < B(1.5) || t >= B(5.4) ? '' : KEYS.filter(([b]) => t >= B(b)).map(([, c]) => c).join(''));
+const BTN_L = K.track([[0, 112], [1, 52], [6, 112]], SP.morph);      // search button: circle → "Search" pill on focus
+const BTN_ICON = K.track([[0, 132], [1, 74], [6, 132]], SP.morph);
+const GUESTS = K.track([[0, 0], [11, 1], [12, 2]], SP.snap);        // 2 → 3 → 4, digit roll
+const PLUS_PRESS = K.track([[0, 0], [10.75, 1], [11, 0], [11.75, 1], [12, 0]], SP.press);
+const LIKED = K.track([[0, 0], [14, 1]], SP.snap);                  // heart fill + 318 → 319
+// the card's content rides its growing edges (never cropped): functions of the shape width
+const leftEdge = (inset) => (t) => -SW(t) / 2 + inset, rightEdge = (inset) => (t) => SW(t) / 2 - inset;
+const BADGE = K.trackN([[0, [8, -8, 17]], [16, [rightEdge(26), 11, 8]]], SP.morph);   // cx, cy, size: badge → unread dot
+const AV_M = K.trackN([[0, [leftEdge(40), 0, 44]], [18, [-28, 0, 40]], [19, [-66, 0, 40]]], SP.morph);
+const AV_J = K.trackN([[0, [leftEdge(58), 16, 22]], [18, [0, 0, 40]], [19, [-22, 0, 40]]], SP.morph);
+const AV_A = K.trackN([[0, [0, 0, 40]], [18, [28, 0, 40]], [19, [22, 0, 40]]], SP.morph);
+const ADD_HOVER = K.track([[0, 0], [20, 1]], SP.color);             // the invite button inverts under the cursor
+const ADD_PRESS = K.track([[0, 0], [20.75, 1], [21, 0]], SP.press);
+const LOAD = K.track([[2, 0.3], [21.5, 0.68], [22, 1]], SP.snap);   // toast progress ring
+const DISC = K.track([[2, 0], [22, 1]], SP.snap);                   // accent disc under the check
+
+// ---------------------------------------------------------------- DOM
+const $ = (s) => document.querySelector(s);
+const world = $('#world'), shape = $('#shape'), origin = $('#origin');
+const el = Object.fromEntries(['blob', 'endA', 'endB', 'ph', 'typed', 'caret', 'sBtn', 'sBtnIcon', 'sBtnLabel', 'divider', 'month',
+  'rangeLbl', 'chevL', 'chevR', 'minus', 'plus', 'guests', 'gStrip', 'gWord', 'heart', 'likes', 'lStrip', 'bell', 'avM', 'avJ', 'avA',
+  'badge', 'badgeN', 'nTitle1', 'nTitle2', 'nBody', 'nTime', 'addBtn', 'tIcon', 'tiArc', 'tiDisc', 'tiCheck', 'tText1', 'tText2', 'tUndo']
+  .map((id) => [id, document.getElementById(id)]));
+const mk = (cls, txt) => { const e = document.createElement('div'); e.className = cls; if (txt != null) e.textContent = txt; el.divider.after(e); return e; };
+// dropdown rows (tile, title, subtitle), weekday letters, days; range-row days get an "inside" copy for the inversion
+const rowEls = ROWS.map(([a, b]) => { const tile = mk(''); tile.innerHTML = icon('pin', 18, 1.8, 'currentColor'); return [tile, mk('t', a), mk('t', b)]; });
+const wdEls = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((c) => mk('t', c));
+const dayEls = [], dayIn = {};
+for (let d = 1; d <= 31; d++) { dayEls[d] = mk('t num', d); if (dayPos(d)[1] === RANGE_ROW) dayIn[d] = mk('t num', d); }
+Object.values(dayIn).forEach((e) => origin.appendChild(e)); // inside copies sit above everything else
+el.sBtnIcon.innerHTML = icon('search', 16, 2.2, 'currentColor');
+el.chevL.innerHTML = icon('chevronLeft', 18, 2, 'currentColor');
+el.chevR.innerHTML = icon('chevronRight', 18, 2, 'currentColor');
+el.minus.innerHTML = icon('minus', 18, 2, 'currentColor');
+el.plus.innerHTML = icon('plus', 18, 2, 'currentColor');
+el.bell.innerHTML = icon('bell', 22, 2, 'currentColor');
+el.addBtn.innerHTML = icon('plus', 16, 2, 'currentColor');
+const HEART_SW = (2 * 24) / 22; // 2 px at 22 px, like MorphKit.icon
+el.heart.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" style="position:absolute;left:0;top:0"><path d="${ICONS.heart}"
+  fill="none" stroke="currentColor" stroke-width="${HEART_SW}" stroke-linejoin="round"/></svg><svg id="heartFill" width="22" height="22"
+  viewBox="0 0 24 24"><path d="${ICONS.heart}" fill="currentColor" stroke="currentColor" stroke-width="${HEART_SW}" stroke-linejoin="round"/></svg>`;
+const heartFill = $('#heartFill');
+K.attr(el.tiDisc, 'fill', ACC);
+
+// presence windows (enter, exit) in beats — exits are quick, enters trail slightly
+const vis = {
+  ph: (t) => K.presence(t, 0, 2), typed: (t) => K.presence(t, null, 5), caret: (t) => K.presence(t, 1, 5, { delay: 0, enter: spring(0.12, 0) }),
+  sBtn: (t) => K.presence(t, 0, 5, { delay: 0.1 }), sLabel: (t) => K.presence(t, 1, 5, { delay: 0.12 }),
+  menu: (t) => K.presence(t, 2, 5, { delay: 0.06 }),
+  blob: (t) => K.presence(t, 3, 10, { delay: 0 }), ends: (t) => K.presence(t, 9, 10, { instant: true }),
+  month: (t) => K.presence(t, 5, 9, { delay: 0.1 }), range: (t) => K.presence(t, 9, 10, { delay: 0.06 }),
+  cal: (t) => K.presence(t, 5, 10, { delay: 0.12 }),
+  stepper: (t) => K.presence(t, 10, 13, { delay: 0.1 }),
+  like: (t) => K.presence(t, 13, 15, { delay: 0.1 }),
+  bell: (t) => K.presence(t, 15, 16, { delay: 0.08 }), badge: (t) => K.presence(t, 15.5, 18, { delay: 0 }),
+  badgeN: (t) => K.presence(t, 15.5, 16, { delay: 0 }),
+  avM: (t) => K.presence(t, 16, 21, { delay: 0.1 }), avJ: (t) => K.presence(t, 17, 21, { delay: 0 }),
+  avA: (t) => K.presence(t, 18, 21, { delay: 0.12 }), add: (t) => K.presence(t, 19, 21, { delay: 0.08 }),
+  nTitle1: (t) => K.presence(t, 16, 17, { delay: 0.12 }), nTitle2: (t) => K.presence(t, 17, 18, { delay: 0.06 }),
+  nBody: (t) => K.presence(t, 16, 18, { delay: 0.16 }), nTime: (t) => K.presence(t, 16, 18, { delay: 0.2 }),
+  tIcon: (t) => K.presence(t, 21, 24, { delay: 0.1 }), tText1: (t) => K.presence(t, 21, 22, { delay: 0.12 }),
+  tText2: (t) => K.presence(t, 22, 24, { delay: 0.06 }), tUndo: (t) => K.presence(t, 23, 24, { delay: 0.04 }),
+};
+// register the swaps that share a spot, so review.py can catch overlapping labels
+K.layer(el.ph, 'head', vis.ph); K.layer(el.typed, 'head', vis.typed); K.layer(el.month, 'head', vis.month); K.layer(el.rangeLbl, 'head', vis.range);
+K.layer(el.nTitle1, 'n-title', vis.nTitle1); K.layer(el.nTitle2, 'n-title', vis.nTitle2);
+K.layer(el.tText1, 'toast', vis.tText1); K.layer(el.tText2, 'toast', vis.tText2);
+K.layer(el.guests, 'center', vis.stepper); K.layer(el.likes, 'center', vis.like);
+
+// ---------------------------------------------------------------- helpers
+const sw = (v, o) => K.swap(v, o);
+const text = K.textAt, iconAt = K.iconAt; // (el, x, y, size, anchor|v, …) in world px — see kit-api.md
+// avatars: the ring is the shape's own color, so overlaps read as cut-outs on black and on white
+function avatar(e, [x, y, s], v, [bg, fg], ring) {
+  K.css(e, { left: x - s / 2, top: y - s / 2, width: s, height: s, borderRadius: s / 2, background: bg, color: fg,
+    boxShadow: `0 0 0 2px ${ring}`, display: 'grid', placeItems: 'center', fontSize: s * 0.4, fontWeight: 600, lineHeight: 1,
+    ...sw(v, { scale: 0.6 }) });
+}
+// digit rolls: only the digits inside (or rolling through) the clipped cell are rendered
+const rollVis = (strip, v) => [...strip.children].forEach((c, i) => K.css(c, { visibility: Math.abs(i - v) < 0.98 ? 'visible' : 'hidden' }));
+// a clip that removes the rect [l,r]×[t,b] from a w×h box (evenodd hole): the 2-D version of
+// K.splitClip's `outside`, needed here because the range pill is shorter than a full row
+const hole = (w, h, l, r, t, b) => `polygon(evenodd, 0px 0px, ${w}px 0px, ${w}px ${h}px, 0px ${h}px, 0px 0px, ${l}px ${t}px, ${r}px ${t}px, ${r}px ${b}px, ${l}px ${b}px, ${l}px ${t}px)`;
+
+// ---------------------------------------------------------------- frame(t): every dynamic style, every frame
+K.onFrame((t) => {
+  K.css(world, { transform: K.worldTransform() });
+
+  // the shape
+  const w = SW(t), h = SH(t), cx = SCX(t), cy = SCY(t), sq = SQUISH(t), bg = SBG(t);
+  K.css(shape, {
+    ...K.box(cx, cy, w, h, SR(t)), background: bg, transform: `scale(${1 - 0.035 * sq})`,
+    boxShadow: '0 0.5px 1px rgba(0,0,0,.08), 0 10px 26px -14px rgba(0,0,0,.42)',
+  });
+  K.css(origin, { left: w / 2 - cx, top: h / 2 - cy });
+
+  // the blob (under all content) and the committed range's solid ends
+  const L = BLB.L(t), R = BLB.R(t), T = BLB.T(t), Bo = BLB.B(t);
+  K.css(el.blob, { left: L, top: T, width: Math.max(0, R - L), height: Math.max(0, Bo - T), borderRadius: BLB.rad(t),
+    background: BCOL(t), opacity: vis.blob(t) });
+  const ve = vis.ends(t);
+  [[el.endA, R0], [el.endB, R1]].forEach(([e, d]) => {
+    const [j, k] = dayPos(d);
+    K.css(e, { left: COLX(j) - 17, top: WEEKY(k) - 17, width: 34, height: 34, borderRadius: 17, background: ACC, opacity: ve });
+  });
+
+  // ---- search bar: placeholder, typing, caret, the search button that opens into a pill on focus
+  const typed = typedAt(t);
+  // a placeholder vanishes the instant the first key lands — no fade, or it overlaps the typed text
+  text(el.ph, -134, 0, 17, 'l', typed ? 0 : vis.ph(t), { color: I40 });
+  K.text(el.typed, typed);
+  text(el.typed, -134, 0, 17, 'l', typed ? vis.typed(t) : 0, { fontWeight: 500, color: INK });
+  const tw = typed ? el.typed.offsetWidth : 0;
+  K.css(el.caret, { left: -134 + tw + 1.5, top: -11, width: 2, height: 22, borderRadius: 1, background: INK, opacity: vis.caret(t) });
+  const bl = BTN_L(t), vb = vis.sBtn(t);
+  K.css(el.sBtn, { left: bl, top: -20, width: 152 - bl, height: 40, borderRadius: 20, background: INK, overflow: 'hidden', ...sw(vb) });
+  K.css(el.sBtnIcon, { position: 'absolute', left: BTN_ICON(t) - bl - 8, top: 12, width: 16, height: 16, color: PAPER });
+  text(el.sBtnLabel, 90 - bl, 20, 15, 'l', vis.sLabel(t), { fontWeight: 600, color: PAPER });
+
+  // ---- dropdown rows
+  const vm = vis.menu(t);
+  K.css(el.divider, { left: -160, top: 28, width: 320, height: 1, background: I08, opacity: vm });
+  rowEls.forEach(([tile, a, b], i) => {
+    const v = K.presence(t, 2, 5, { delay: 0.1 + i * 0.04 }), yc = ROW_Y[i];
+    K.css(tile, { left: -144, top: yc - 20, width: 40, height: 40, borderRadius: 12, background: PAPER, boxShadow: `inset 0 0 0 1px ${I10}`,
+      display: 'grid', placeItems: 'center', color: I60, ...sw(v, { scale: 0.9 }) });
+    text(a, -92, yc - 9, 15, 'l', v, { fontWeight: 600, color: INK });
+    text(b, -92, yc + 10, 13, 'l', v, { fontWeight: 400, color: I50 });
+  });
+
+  // ---- date picker
+  text(el.month, -128, 0, 17, 'l', vis.month(t), { fontWeight: 600, color: INK });
+  text(el.rangeLbl, -128, 0, 17, 'l', vis.range(t), { fontWeight: 600, color: INK });
+  const vcal = vis.cal(t);
+  iconAt(el.chevL, 94, 0, 18, vcal, I60);
+  iconAt(el.chevR, 124, 0, 18, vcal, I60);
+  wdEls.forEach((e, j) => K.css(e, { left: COLX(j) - 19, top: 34, width: 38, height: 16, textAlign: 'center', fontSize: 12, lineHeight: '16px',
+    fontWeight: 500, color: I40, ...sw(vcal) }));
+  const acc = clamp(ACCAMT(t)), cm = clamp(COMMIT(t));
+  for (let d = 1; d <= 31; d++) {
+    const [j, k] = dayPos(d), v = K.presence(t, 5, 10, { delay: 0.14 + k * 0.03 });
+    const x0 = COLX(j) - 19, y0 = WEEKY(k) - 10, base = { left: x0, top: y0, width: 38, height: 20, textAlign: 'center', fontSize: 15,
+      lineHeight: '20px', fontWeight: 500, ...sw(v) };
+    if (!dayIn[d]) { K.css(dayEls[d], { ...base, color: INK }); continue; }
+    // range row: the numbers invert exactly where the blob covers them (outside copy with a hole, inside copy clipped);
+    // after the release, the middle days go back to ink on the light band and only the ends stay white
+    const l = clamp(L - x0, 0, 38), r = clamp(R - x0, 0, 38), tt = clamp(T - y0, 0, 20), bb = clamp(Bo - y0, 0, 20), on = r > l + 0.01 && bb > tt + 0.01;
+    const inv = d === R0 || d === R1 ? acc : acc * (1 - cm);
+    K.css(dayEls[d], { ...base, color: INK, clipPath: on ? hole(38, 20, l, r, tt, bb) : null });
+    K.css(dayIn[d], { ...base, color: mixHex(INK, PAPER, inv), clipPath: on ? `inset(${tt}px ${38 - r}px ${20 - bb}px ${l}px)` : 'inset(0px 0px 20px 0px)' });
+  }
+
+  // ---- stepper: − 2 guests +
+  const vs = vis.stepper(t), pp = PLUS_PRESS(t);
+  K.css(el.minus, { left: -90, top: -20, width: 40, height: 40, borderRadius: 20, background: W12, display: 'grid', placeItems: 'center', color: PAPER, ...sw(vs) });
+  const sp = sw(vs); // compose the press squish after the swap's own transform
+  K.css(el.plus, { left: 50, top: -20, width: 40, height: 40, borderRadius: 20, background: `rgba(255,255,255,${(0.12 + 0.12 * pp).toFixed(3)})`,
+    display: 'grid', placeItems: 'center', color: PAPER, ...sp, transform: `${sp.transform} scale(${(1 - 0.08 * pp).toFixed(4)})` });
+  text(el.guests, 0, 0, 17, 'c', vs, { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 5, fontWeight: 600, color: PAPER });
+  const gv = GUESTS(t);
+  K.css(el.gStrip, { transform: `translateY(${(-1.2 * gv).toFixed(4)}em)` });
+  rollVis(el.gStrip, gv);
+  K.css(el.gWord, { fontSize: 15, fontWeight: 400, color: W56 });
+
+  // ---- like: ♡ 318 → ♥ 319 (the shape itself turns accent)
+  const vl = vis.like(t), lk = LIKED(t);
+  iconAt(el.heart, -19, 0, 22, vl, PAPER);
+  K.css(heartFill, { position: 'absolute', left: 0, top: 0, transformOrigin: '11px 12px', transform: `scale(${Math.max(0, lk).toFixed(4)})`, opacity: +clamp(lk * 3).toFixed(3) });
+  text(el.likes, -1, 0, 17, 'l', vl, { fontWeight: 600, color: PAPER, display: 'flex' });
+  K.css(el.lStrip, { transform: `translateY(${(-1.2 * lk).toFixed(4)}em)` });
+  rollVis(el.lStrip, lk);
+
+  // ---- notification: bell + badge → card (badge → unread dot) → the avatars carry into the stack
+  iconAt(el.bell, 0, 0.5, 22, vis.bell(t), PAPER);
+  const [bx, by, bs] = BADGE(t);
+  K.css(el.badge, { left: bx - bs / 2, top: by - bs / 2, width: bs, height: bs, borderRadius: bs / 2, background: ACC, boxShadow: `0 0 0 2px ${bg}`,
+    display: 'grid', placeItems: 'center', ...sw(vis.badge(t), { scale: 0.3, blur: 6 }) });
+  K.css(el.badgeN, { fontSize: 10, fontWeight: 700, color: PAPER, lineHeight: 1, ...sw(vis.badgeN(t), { blur: 6 }) });
+  avatar(el.avM, AV_M(t), vis.avM(t), AV.M, bg);
+  avatar(el.avJ, AV_J(t), vis.avJ(t), AV.J, bg);
+  avatar(el.avA, AV_A(t), vis.avA(t), AV.A, bg);
+  text(el.nTitle1, -76, -11, 15, 'l', vis.nTitle1(t), { fontWeight: 600, color: PAPER });
+  text(el.nTitle2, -76, -11, 15, 'l', vis.nTitle2(t), { fontWeight: 600, color: PAPER });
+  text(el.nBody, -76, 11, 13, 'l', vis.nBody(t), { fontWeight: 400, color: W56 });
+  text(el.nTime, w / 2 - 22, -11, 12, 'r', vis.nTime(t), { fontWeight: 500, color: W40 });
+
+  // ---- avatar stack: the invite button rolls in with the spread, inverts under the cursor, squishes on the click
+  const ah = clamp(ADD_HOVER(t)), ap = ADD_PRESS(t), sa = sw(vis.add(t), { scale: 0.5 });
+  K.css(el.addBtn, { left: C_ADD[0] - 20, top: -20, width: 40, height: 40, borderRadius: 20, background: mixHex(PAPER, INK, ah),
+    boxShadow: `inset 0 0 0 1.5px rgba(11,11,12,${(0.1 * (1 - ah)).toFixed(3)})`, display: 'grid', placeItems: 'center', color: mixHex(INK, PAPER, ah),
+    ...sa, transform: `${sa.transform} scale(${(1 - 0.08 * ap).toFixed(4)})` });
+
+  // ---- toast: sending (ring steps) → sent (accent disc + check) → undo; content rides the pill's edges
+  const vti = vis.tIcon(t), C = 2 * Math.PI * 9.5;
+  iconAt(el.tIcon, -w / 2 + 28, 0, 24, vti, null);
+  K.attr(el.tiArc, 'stroke-dasharray', `${(C * clamp(LOAD(t))).toFixed(3)} ${C.toFixed(3)}`);
+  K.attr(el.tiDisc, 'r', 11 * Math.max(0, DISC(t)));
+  const ck = clamp((K.since(t, 22) - 0.05) / 0.3);
+  K.attr(el.tiCheck, 'stroke-dasharray', 14);
+  K.attr(el.tiCheck, 'stroke-dashoffset', 14 * (1 - minjerk(ck)));
+  text(el.tText1, -w / 2 + 50, 0, 15, 'l', vis.tText1(t), { fontWeight: 500, color: PAPER });
+  text(el.tText2, -w / 2 + 50, 0, 15, 'l', vis.tText2(t), { fontWeight: 500, color: PAPER });
+  text(el.tUndo, w / 2 - 24, 0, 15, 'r', vis.tUndo(t), { fontWeight: 500, color: W56 });
+});
+
+K.mount($('#stage'), { audio: CONFIG.audio });
+</script>
+</body>
+</html>

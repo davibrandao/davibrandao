@@ -20,6 +20,9 @@ loader → check → dynamic island → music player → volume slider → toggl
 ⌘K pill → command palette → toast → button). Along the way it plays, scrubs, stretches the
 volume past max, types, and presses enter. Read it before building. It shows every pattern
 below working together, and most new states are variations of something in it.
+`examples/trip-planner.html` is a second build (6 bars at 124 BPM, one accent) on different
+states: search bar → dropdown → date range → stepper → like → notification → avatar stack →
+toast. Read it when the requested states overlap those.
 
 Paths: `$SKILL` below means this skill's folder. Run everything from the user's working
 directory, so the song, `beats.json` and the project folder live there, never inside
@@ -109,14 +112,14 @@ cheapest moment to change the story.
 ### 4. Build
 
 ```bash
-python3 $SKILL/scripts/new_project.py morph-loop --beats beats.json --song song.mp3 [--accent '#FF4F1A'] [--from-example]
+python3 $SKILL/scripts/new_project.py morph-loop --beats beats.json --song song.mp3 [--accent '#FF4F1A'] [--from-example [reference|trip-planner]]
 ```
 
 This writes `index.html` (the beat grid is already in `CONFIG`), `morph-kit.js`, the
-font, a UI sound kit, and a music-only `mix.wav`. Pass `--from-example` only when most of
-the chosen states are the reference's. Its 28-beat timeline must be re-timed for any other
-length, and the script warns you. Otherwise, start from the template and copy patterns out
-of the reference. Both use the same layout: content in world px under `#origin`, inside the
+font, a UI sound kit, and a music-only `mix.wav`. Pass `--from-example` (the reference) or
+`--from-example trip-planner` only when most of the chosen states are in that build. Its
+timeline must be re-timed for any other length, and the script warns you. Otherwise, start
+from the template and copy patterns out of the examples. Both use the same layout: content in world px under `#origin`, inside the
 one `#shape`. Build in this order, because each layer depends on the one before:
 
 1. `PLAN`: the beat sheet from step 3, registered with `K.event()`. Add sounds with `K.cue()`.
@@ -250,7 +253,8 @@ The full API, with the reasons behind each default, is in `references/kit-api.md
 
 - `assets/morph-kit.js`: the runtime (springs, tracks, edges, swaps, camera, cursor, drags,
   audit, dev player).
-- `assets/template.html`: a minimal scaffold. `examples/reference.html` is the full build.
+- `assets/template.html`: a minimal scaffold. `examples/reference.html` (7 bars, B&W) and
+  `examples/trip-planner.html` (6 bars, accent) are full builds.
 - `scripts/`: `analyze_beats.py`, `new_project.py`, `review.py`, `render.py`, `bundle.py`,
   `serve.py`, `mix_audio.py`, `ui_sounds.py`, `placeholder_track.py`, `common.py`.
 - `references/choreography.md`: planning the beat grid, the plan format, cursor and camera

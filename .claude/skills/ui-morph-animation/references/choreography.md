@@ -40,7 +40,7 @@ built end to end.
 - **Trip planner (8 states, 6 bars):** search bar → dropdown → date picker (range drag) →
   stepper (guests) → like → notification → avatar stack → toast. Carried parts: the
   dropdown highlight → calendar hover dot → range pill; the bell badge → unread dot; the
-  card avatars → the stack.
+  card avatars → the stack. This is `examples/trip-planner.html`.
 - **Sign-up (8 states, 5–6 bars):** button → dropdown (plan) → pricing switch (price rolls) →
   stepper (seats) → text field (email) → OTP code → check → toast.
 - **Publish a shot (8 states, 5–6 bars):** button → upload (progress) → check → like →
